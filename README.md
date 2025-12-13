@@ -29,17 +29,14 @@ The idea and main structure is taken from the [SES Dashboard](https://github.com
 
 ### Prerequisites
 
-- use DDEV environment (see below)
-
-OR
-
 - PHP 8.2+
-- Node.js 18+
 - MySQL 8.0+
 - Composer
-- npm/yarn
+- **Optional:** Node.js 18+ and npm/yarn (only needed if you want to modify or rebuild frontend assets)
 
-### No DDEV - Laravel Setup
+> **Note:** The compiled frontend assets are included in the repository, so you don't need Node.js to run the application. You only need it if you want to modify Vue components, styles, or rebuild the assets.
+
+### Quick Start (No DDEV)
 
 1. **Clone and install dependencies:**
    ```bash
@@ -47,6 +44,7 @@ OR
    cd <repository-name>
    composer install
    ```
+   > No need to run `npm install` - compiled assets are already included!
 
 2. **Environment configuration:**
    ```bash
@@ -65,7 +63,9 @@ OR
    php artisan serve
    ```
 
-### Vue.js Frontend Setup
+### Frontend Development (Optional)
+
+If you want to modify Vue components, styles, or rebuild frontend assets:
 
 1. **Install Node.js dependencies:**
    ```bash
@@ -86,45 +86,7 @@ OR
    ```bash
    npm run prod
    ```
-
-## DDEV Kickstart
-
-If you're using DDEV for local development:
-
-1. **Create DDEV project:**
-   ```bash
-   git clone <repository-url>
-   cd <repository-name>
-   ddev config --project-type=laravel --docroot=public --create-docroot
-   ddev start
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   ddev composer install
-   ddev npm install
-   ```
-
-3. **Setup environment:**
-   ```bash
-   ddev exec cp .env.example .env
-   ddev exec php artisan key:generate
-   ```
-
-4. **Database setup:**
-   ```bash
-   ddev exec php artisan migrate
-   ddev exec php artisan db:seed
-   ```
-
-5. **Build frontend assets:**
-   ```bash
-   ddev npm run dev
-   ```
-
-6. **Access the application:**
-   - Visit: `https://<repository-name>.ddev.site`
-
+   
 ## Initial Data & Admin User
 
 The database seeder creates an initial admin user:
