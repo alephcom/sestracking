@@ -31,32 +31,62 @@ class SesWebhookController extends Controller
             return response('OK');
         }
 
-        // Validate that we have a MessageId for non-subscription messages
-        $messageId = $sns['MessageId'] ?? null;
-        if (!$messageId) {
-            Log::warning('SNS notification missing MessageId', ['sns_type' => $sns['Type'] ?? 'unknown', 'payload' => $sns]);
-            return response('Missing MessageId', 400);
-        }
-
-        /* 2️⃣  Throw away duplicates immediately */
-        if (RecipientEvent::where('sns_message_id', $messageId)->exists()) {
-            return response('Duplicate OK');
-        }
-
-        /* 3️⃣  Your tenant  */
+        /* 3️⃣  Your tenant - get project early for both formats */
         $project = Project::whereToken($token)->firstOrFail();
 
-        /* 4️⃣  Inner SES payload */
-        $message = $sns['Message'] ?? null;
-        if (!$message) {
-            Log::warning('SNS notification missing Message field', ['message_id' => $messageId, 'sns_type' => $sns['Type'] ?? 'unknown']);
-            return response('Missing Message', 400);
-        }
+        // Detect if this is SNS-wrapped or direct SES notification
+        $messageId = null;
+        $ses = null;
 
-        $ses = json_decode($message, true);
-        if (!$ses) {
-            Log::warning('SNS Message field contains invalid JSON', ['message_id' => $messageId, 'message' => $message]);
-            return response('Invalid Message JSON', 400);
+        // Check if this is an SNS notification (has Type and MessageId)
+        if (isset($sns['Type']) && isset($sns['MessageId'])) {
+            // SNS format: has MessageId at top level
+            $messageId = $sns['MessageId'];
+            
+            /* 2️⃣  Throw away duplicates immediately */
+            if (RecipientEvent::where('sns_message_id', $messageId)->exists()) {
+                return response('Duplicate OK');
+            }
+
+            /* 4️⃣  Inner SES payload */
+            $message = $sns['Message'] ?? null;
+            if (!$message) {
+                Log::warning('SNS notification missing Message field', ['message_id' => $messageId, 'sns_type' => $sns['Type'] ?? 'unknown']);
+                return response('Missing Message', 400);
+            }
+
+            $ses = json_decode($message, true);
+            if (!$ses) {
+                Log::warning('SNS Message field contains invalid JSON', ['message_id' => $messageId, 'message' => $message]);
+                return response('Invalid Message JSON', 400);
+            }
+        } 
+        // Check if this is a direct SES notification (has eventType and mail)
+        elseif (isset($sns['eventType']) && isset($sns['mail'])) {
+            // Direct SES format: treat the payload as the SES notification directly
+            $ses = $sns;
+            
+            // Generate a unique MessageId from the SES mail messageId and timestamp for deduplication
+            $sesMessageId = $ses['mail']['messageId'] ?? null;
+            $timestamp = $ses['mail']['timestamp'] ?? now()->toIso8601String();
+            $eventType = $ses['eventType'] ?? 'unknown';
+            
+            if ($sesMessageId) {
+                // Create a unique ID combining messageId, eventType, and timestamp for deduplication
+                $messageId = 'ses-' . md5($sesMessageId . '-' . $eventType . '-' . ($ses[$eventType]['timestamp'] ?? $timestamp));
+            } else {
+                // Fallback: generate from payload hash
+                $messageId = 'ses-' . md5(json_encode($ses));
+            }
+
+            /* 2️⃣  Throw away duplicates immediately */
+            if (RecipientEvent::where('sns_message_id', $messageId)->exists()) {
+                return response('Duplicate OK');
+            }
+        } else {
+            // Unknown format
+            Log::warning('Unknown webhook payload format', ['payload_keys' => array_keys($sns), 'payload' => $sns]);
+            return response('Unknown payload format', 400);
         }
 
         $email = Email::firstOrCreate(

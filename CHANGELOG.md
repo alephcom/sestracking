@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2025-12-14
+
+### Fixed
+- Webhook now handles both SNS-wrapped and direct SES notification formats
+- Fixed "SNS notification missing MessageId" error for direct SES notifications
+- Webhook detects payload format automatically and generates MessageId for direct SES notifications
+- Added migration to ensure `sent_at` column exists in `emails` table
+- Fixes "Column not found: 1054 Unknown column 'sent_at'" error in production
+
+### Changed
+- Webhook controller now supports receiving SES notifications directly (without SNS wrapper)
+- MessageId generation for direct SES notifications uses mail messageId, eventType, and timestamp for uniqueness
+
 ## [0.2.6] - 2025-12-14
 
 ### Fixed
@@ -181,6 +194,7 @@ php artisan db:seed
 ## Contributors
 - Initial structure based on [SES Dashboard](https://github.com/Nikeev/sesdashboard) by Nikeev (MIT License)
 
+[0.2.7]: https://github.com/yourusername/sestracking/releases/tag/v0.2.7
 [0.2.6]: https://github.com/yourusername/sestracking/releases/tag/v0.2.6
 [0.2.5]: https://github.com/yourusername/sestracking/releases/tag/v0.2.5
 [0.2.4]: https://github.com/yourusername/sestracking/releases/tag/v0.2.4
