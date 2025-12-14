@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] - 2025-12-14
+
+### Fixed
+- Production error: `Field 'destination' doesn't have a default value` in emails table
+- Added migration to ensure `destination` column exists in `emails` table
+- Column is added as nullable for backward compatibility
+
 ## [0.2.7] - 2025-12-14
 
 ### Fixed
@@ -194,6 +201,7 @@ php artisan db:seed
 ## Contributors
 - Initial structure based on [SES Dashboard](https://github.com/Nikeev/sesdashboard) by Nikeev (MIT License)
 
+[0.2.8]: https://github.com/yourusername/sestracking/releases/tag/v0.2.8
 [0.2.7]: https://github.com/yourusername/sestracking/releases/tag/v0.2.7
 [0.2.6]: https://github.com/yourusername/sestracking/releases/tag/v0.2.6
 [0.2.5]: https://github.com/yourusername/sestracking/releases/tag/v0.2.5
