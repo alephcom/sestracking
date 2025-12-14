@@ -43,10 +43,8 @@ class SesWebhookController extends Controller
             // SNS format: has MessageId at top level
             $messageId = $sns['MessageId'];
             
-            /* 2️⃣  Throw away duplicates immediately */
-            if (RecipientEvent::where('sns_message_id', $messageId)->exists()) {
-                return response('Duplicate OK');
-            }
+            // Note: Duplicate check is now done per recipient using firstOrCreate
+            // No need to check here since we use composite unique constraint
 
             /* 4️⃣  Inner SES payload */
             $message = $sns['Message'] ?? null;
@@ -79,10 +77,8 @@ class SesWebhookController extends Controller
                 $messageId = 'ses-' . md5(json_encode($ses));
             }
 
-            /* 2️⃣  Throw away duplicates immediately */
-            if (RecipientEvent::where('sns_message_id', $messageId)->exists()) {
-                return response('Duplicate OK');
-            }
+            // Note: Duplicate check is now done per recipient using firstOrCreate
+            // No need to check here since we use composite unique constraint
         } else {
             // Unknown format
             Log::warning('Unknown webhook payload format', ['payload_keys' => array_keys($sns), 'payload' => $sns]);
@@ -126,16 +122,20 @@ class SesWebhookController extends Controller
                 $availableRecipient = EmailRecipient::where('email_id', $email->id)->first();
             }
 
-            /* 6️⃣  Store the event for the selected recipient */
-            RecipientEvent::create([
-                'recipient_id'   => $availableRecipient->id,
-                'sns_message_id' => $messageId,
-                'type'           => $type,
-                'event_at'       => Carbon::parse(
-                    $ses[$type]['timestamp'] ?? $ses['mail']['timestamp']
-                ),
-                'payload'        => $ses,
-            ]);
+            /* 6️⃣  Store the event for the selected recipient (use firstOrCreate to handle duplicates) */
+            RecipientEvent::firstOrCreate(
+                [
+                    'sns_message_id' => $messageId,
+                    'recipient_id'   => $availableRecipient->id,
+                    'type'           => $type,
+                ],
+                [
+                    'event_at'       => Carbon::parse(
+                        $ses[$type]['timestamp'] ?? $ses['mail']['timestamp']
+                    ),
+                    'payload'        => $ses,
+                ]
+            );
 
             /* 8️⃣  Increment counters immediately for open/click */
             if ($type === 'open')   { $email->increment('opens'); }
@@ -149,16 +149,20 @@ class SesWebhookController extends Controller
                     ['email_id' => $email->id, 'address' => strtolower($address)]
                 );
 
-                /* 6️⃣  Store the event once per recipient */
-                RecipientEvent::create([
-                    'recipient_id'   => $recipient->id,
-                    'sns_message_id' => $messageId,
-                    'type'           => $type,
-                    'event_at'       => Carbon::parse(
-                        $ses[$type]['timestamp'] ?? $ses['mail']['timestamp']
-                    ),
-                    'payload'        => $ses,
-                ]);
+                /* 6️⃣  Store the event once per recipient (use firstOrCreate to handle duplicates) */
+                RecipientEvent::firstOrCreate(
+                    [
+                        'sns_message_id' => $messageId,
+                        'recipient_id'   => $recipient->id,
+                        'type'           => $type,
+                    ],
+                    [
+                        'event_at'       => Carbon::parse(
+                            $ses[$type]['timestamp'] ?? $ses['mail']['timestamp']
+                        ),
+                        'payload'        => $ses,
+                    ]
+                );
 
                 /* 7️⃣  Update per-recipient status (only once thanks to UNIQUE) */
                 match ($type) {

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2025-12-14
+
+### Fixed
+- Production error: `Duplicate entry for key 'recipient_events_sns_message_id_unique'`
+- Changed unique constraint on `recipient_events` table from `sns_message_id` alone to composite (`sns_message_id`, `recipient_id`, `type`)
+- This allows the same SNS message to create events for multiple recipients (one per recipient)
+- Updated `RecipientEvent::create()` calls to use `firstOrCreate()` to gracefully handle duplicates
+- Removed early duplicate check that was preventing multi-recipient events from being processed correctly
+
 ## [0.3.1] - 2025-12-14
 
 ### Fixed
@@ -222,6 +231,7 @@ php artisan db:seed
 ## Contributors
 - Initial structure based on [SES Dashboard](https://github.com/Nikeev/sesdashboard) by Nikeev (MIT License)
 
+[0.3.2]: https://github.com/yourusername/sestracking/releases/tag/v0.3.2
 [0.3.1]: https://github.com/yourusername/sestracking/releases/tag/v0.3.1
 [0.3.0]: https://github.com/yourusername/sestracking/releases/tag/v0.3.0
 [0.2.9]: https://github.com/yourusername/sestracking/releases/tag/v0.2.9
