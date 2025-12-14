@@ -21,8 +21,27 @@ class ProjectManagementController extends Controller
     {
         $this->authorize('create', Project::class);
         
-        $users = User::where('role', User::ROLE_USER)->orderBy('name')->get();
-        return view('admin.projects.create', compact('users'));
+        return view('admin.projects.create');
+    }
+    
+    public function searchUsers(Request $request)
+    {
+        // Allow search if user can view any projects (admin access)
+        $this->authorize('viewAny', Project::class);
+        
+        $request->validate([
+            'query' => 'required|string|min:8',
+        ]);
+        
+        $query = $request->get('query');
+        
+        // Search users by email starting with the query
+        $users = User::where('email', 'like', $query . '%')
+            ->orderBy('email')
+            ->limit(50)
+            ->get(['id', 'name', 'email']);
+        
+        return response()->json($users);
     }
 
     public function store(Request $request)
@@ -32,7 +51,9 @@ class ProjectManagementController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'users' => 'array',
-            'users.*' => 'exists:users,id'
+            'users.*' => 'exists:users,id',
+            'admins' => 'array',
+            'admins.*' => 'exists:users,id',
         ]);
 
         $project = Project::create([
@@ -40,9 +61,25 @@ class ProjectManagementController extends Controller
             'token' => generateToken(),
         ]);
 
-        // Assign users to project
+        // Assign users to project with roles
+        $usersToAttach = [];
+        
+        // Add regular users
         if ($request->has('users')) {
-            $project->users()->attach($request->users);
+            foreach ($request->users as $userId) {
+                $usersToAttach[$userId] = ['role' => 'user'];
+            }
+        }
+        
+        // Add admins
+        if ($request->has('admins')) {
+            foreach ($request->admins as $userId) {
+                $usersToAttach[$userId] = ['role' => 'admin'];
+            }
+        }
+        
+        if (!empty($usersToAttach)) {
+            $project->users()->attach($usersToAttach);
         }
 
         return redirect()->route('admin.projects.index')
@@ -53,10 +90,20 @@ class ProjectManagementController extends Controller
     {
         $this->authorize('update', $project);
         
-        $users = User::where('role', User::ROLE_USER)->orderBy('name')->get();
-        $assignedUsers = $project->users->pluck('id')->toArray();
+        // Get assigned users and admins
+        $assignedUsers = $project->users()->wherePivot('role', 'user')->pluck('users.id')->toArray();
+        $assignedAdmins = $project->users()->wherePivot('role', 'admin')->pluck('users.id')->toArray();
         
-        return view('admin.projects.edit', compact('project', 'users', 'assignedUsers'));
+        // Get user details for display
+        $userDetails = $project->users->map(function ($user) {
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ];
+        })->keyBy('id')->toArray();
+        
+        return view('admin.projects.edit', compact('project', 'assignedUsers', 'assignedAdmins', 'userDetails'));
     }
 
     public function update(Request $request, Project $project)
@@ -66,15 +113,33 @@ class ProjectManagementController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'users' => 'array',
-            'users.*' => 'exists:users,id'
+            'users.*' => 'exists:users,id',
+            'admins' => 'array',
+            'admins.*' => 'exists:users,id',
         ]);
 
         $project->update([
             'name' => $request->name,
         ]);
 
-        // Update user assignments
-        $project->users()->sync($request->users ?? []);
+        // Update user assignments with roles
+        $usersToSync = [];
+        
+        // Add regular users
+        if ($request->has('users')) {
+            foreach ($request->users as $userId) {
+                $usersToSync[$userId] = ['role' => 'user'];
+            }
+        }
+        
+        // Add admins
+        if ($request->has('admins')) {
+            foreach ($request->admins as $userId) {
+                $usersToSync[$userId] = ['role' => 'admin'];
+            }
+        }
+        
+        $project->users()->sync($usersToSync);
 
         return redirect()->route('admin.projects.index')
             ->with('success', 'Project updated successfully!');

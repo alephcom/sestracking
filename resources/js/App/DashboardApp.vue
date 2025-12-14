@@ -74,7 +74,7 @@ export default {
 
       axios.get(window.dashboardEndpoint, {
         params: {
-          projectId: this.projectId === 'all' ? 'all' : parseInt(this.projectId),
+          projectId: this.projectId, // Can be 'all' or comma-separated IDs
           dateFrom:  moment(this.dateRange.startDate).startOf('day').utc().toDate(),
           dateTo: moment(this.dateRange.endDate).endOf('day').utc().toDate(),
           tzOffset: moment().utcOffset()

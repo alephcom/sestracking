@@ -13,7 +13,8 @@ class ProjectPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->isAdmin();
+        // Super admins or users who are admin for any project can view all projects
+        return $user->isSuperAdmin() || $user->isAdminForAnyProject();
     }
 
     /**
@@ -29,7 +30,8 @@ class ProjectPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        // Only super admins can directly create projects
+        return $user->isSuperAdmin();
     }
 
     /**
@@ -37,7 +39,7 @@ class ProjectPolicy
      */
     public function update(User $user, Project $project): bool
     {
-        return $user->isAdmin();
+        return $user->isAdminForProject($project);
     }
 
     /**
@@ -45,7 +47,7 @@ class ProjectPolicy
      */
     public function delete(User $user, Project $project): bool
     {
-        return $user->isAdmin();
+        return $user->isAdminForProject($project);
     }
 
     /**

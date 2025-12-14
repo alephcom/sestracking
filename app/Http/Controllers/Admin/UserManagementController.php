@@ -30,9 +30,11 @@ class UserManagementController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role' => ['required', Rule::in([User::ROLE_ADMIN, User::ROLE_USER])],
+            'super_admin' => 'boolean',
             'projects' => 'array',
-            'projects.*' => 'exists:projects,id'
+            'projects.*' => 'exists:projects,id',
+            'project_roles' => 'array',
+            'project_roles.*' => ['required', 'in:admin,user']
         ]);
 
         DB::transaction(function () use ($request) {
@@ -40,12 +42,17 @@ class UserManagementController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'role' => $request->role,
+                'super_admin' => $request->has('super_admin'),
             ]);
 
-            // Attach projects if user is not admin (admins have access to all projects)
-            if ($request->role === User::ROLE_USER && $request->projects) {
-                $user->projects()->attach($request->projects);
+            // Attach projects with roles (only if not super admin)
+            if (!$user->isSuperAdmin() && $request->has('projects')) {
+                $projectsToAttach = [];
+                foreach ($request->projects as $projectId) {
+                    $role = $request->project_roles[$projectId] ?? 'user';
+                    $projectsToAttach[$projectId] = ['role' => $role];
+                }
+                $user->projects()->attach($projectsToAttach);
             }
         });
 
@@ -63,31 +70,31 @@ class UserManagementController extends Controller
     {
         $projects = Project::all();
         $assignedProjects = $user->projects->pluck('id')->toArray();
+        $projectRoles = $user->projects->mapWithKeys(function ($project) {
+            return [$project->id => $project->pivot->role];
+        })->toArray();
         
-        return view('admin.users.edit', compact('user', 'projects', 'assignedProjects'));
+        return view('admin.users.edit', compact('user', 'projects', 'assignedProjects', 'projectRoles'));
     }
 
     public function update(Request $request, User $user)
     {
-        // Protect user ID=1 from role changes
-        $roleValidation = $user->id === 1 
-            ? ['required', Rule::in([User::ROLE_ADMIN])] 
-            : ['required', Rule::in([User::ROLE_ADMIN, User::ROLE_USER])];
-
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => 'nullable|string|min:8|confirmed',
-            'role' => $roleValidation,
+            'super_admin' => 'boolean',
             'projects' => 'array',
-            'projects.*' => 'exists:projects,id'
+            'projects.*' => 'exists:projects,id',
+            'project_roles' => 'array',
+            'project_roles.*' => ['required', 'in:admin,user']
         ]);
 
         DB::transaction(function () use ($request, $user) {
             $updateData = [
                 'name' => $request->name,
                 'email' => $request->email,
-                'role' => $request->role,
+                'super_admin' => $request->has('super_admin'),
             ];
 
             // Only update password if provided
@@ -97,12 +104,18 @@ class UserManagementController extends Controller
 
             $user->update($updateData);
 
-            // Update project assignments
-            if ($request->role === User::ROLE_USER) {
-                // Regular users get assigned projects
-                $user->projects()->sync($request->projects ?? []);
+            // Update project assignments with roles (only if not super admin)
+            if (!$user->isSuperAdmin()) {
+                $projectsToSync = [];
+                if ($request->has('projects')) {
+                    foreach ($request->projects as $projectId) {
+                        $role = $request->project_roles[$projectId] ?? 'user';
+                        $projectsToSync[$projectId] = ['role' => $role];
+                    }
+                }
+                $user->projects()->sync($projectsToSync);
             } else {
-                // Admins don't need project assignments (they have access to all)
+                // Super admins don't need project assignments
                 $user->projects()->detach();
             }
         });

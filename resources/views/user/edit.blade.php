@@ -12,5 +12,5 @@
 @endsection
 
 @section('page-content')
-    @include('user.form', ['form' => $form]);
+    @include('user.form', ['form' => $form])
 @endsection

@@ -56,21 +56,25 @@
                     </td>
                     <td>{{ $user->email }}</td>
                     <td>
-                        <span class="badge bg-{{ $user->role === 'admin' ? 'danger' : 'primary' }}">
-                            {{ ucfirst($user->role) }}
-                        </span>
+                        @if($user->isSuperAdmin())
+                            <span class="badge bg-dark">Super Admin</span>
+                        @elseif($user->isAdminForAnyProject())
+                            <span class="badge bg-danger">Admin (some projects)</span>
+                        @else
+                            <span class="badge bg-primary">User</span>
+                        @endif
                     </td>
                     <td>
-                        @if($user->isAdmin())
-                            <span class="text-muted">All Projects</span>
+                        @if($user->isSuperAdmin())
+                            <span class="text-muted">All Projects (Super Admin)</span>
+                        @elseif($user->projects->count() > 0)
+                            @foreach($user->projects as $project)
+                                <span class="badge bg-{{ $project->pivot->role === 'admin' ? 'danger' : 'secondary' }} me-1">
+                                    {{ $project->name }} ({{ $project->pivot->role }})
+                                </span>
+                            @endforeach
                         @else
-                            @if($user->projects->count() > 0)
-                                @foreach($user->projects as $project)
-                                    <span class="badge bg-secondary me-1">{{ $project->name }}</span>
-                                @endforeach
-                            @else
-                                <span class="text-muted">No Projects</span>
-                            @endif
+                            <span class="text-muted">No Projects</span>
                         @endif
                     </td>
                     <td>{{ $user->created_at->format('M j, Y') }}</td>

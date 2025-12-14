@@ -20,7 +20,7 @@ The idea and main structure is taken from the [SES Dashboard](https://github.com
 ## Architecture
 
 - **Backend:** Laravel 11 with MySQL
-- **Frontend:** Vue.js 2.7 with Bootstrap Vue
+- **Frontend:** Vanilla JavaScript with Bootstrap 5 and Chart.js
 - **Build Tool:** Laravel Mix
 - **Email Service:** AWS SES
 - **Webhook Processing:** SNS integration with idempotency
@@ -36,7 +36,7 @@ The idea and main structure is taken from the [SES Dashboard](https://github.com
 
 > **Note:** The compiled frontend assets are included in the repository, so you don't need Node.js to run the application. You only need it if you want to modify Vue components, styles, or rebuild the assets.
 
-### Quick Start (No DDEV)
+### Quick Start
 
 1. **Clone and install dependencies:**
    ```bash
@@ -127,7 +127,7 @@ MAIL_FROM_NAME="${APP_NAME}"
 APP_NAME="SES Dashboard"
 APP_ENV=local
 APP_DEBUG=true
-APP_URL=http://localhost:8000 # or your DDEV URL like https://<repository-name>.ddev.site
+APP_URL=http://localhost:8000
 
 ```
 
@@ -141,11 +141,7 @@ WEBHOOK_DEBUG_LOG=false
 
 Run the test suite:
 ```bash
-# Standard PHP environment
 vendor/bin/phpunit
-
-# DDEV environment
-ddev exec vendor/bin/phpunit
 ```
 
 ## Webhook Setup
@@ -160,4 +156,3 @@ Each project has a unique token for webhook authentication.
 
 ## TODO
 - [ ] Add more detailed documentation for setting up AWS SES and SNS
-- [ ] Add detailed documentation for configuring tunnels from SNS through cloudflared and caddy inside DDEV container with HOST replacement

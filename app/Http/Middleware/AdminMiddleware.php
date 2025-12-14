@@ -15,7 +15,8 @@ class AdminMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!auth()->user()->isAdmin()) {
+        $user = auth()->user();
+        if (!$user->isSuperAdmin() && !$user->isAdminForAnyProject()) {
             abort(403, 'Unauthorized');
         }
         

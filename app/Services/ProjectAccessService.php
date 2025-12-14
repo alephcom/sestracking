@@ -13,9 +13,28 @@ class ProjectAccessService
      */
     public function getAccessibleProjects(User $user): Collection
     {
-        return $user->isAdmin() 
-            ? Project::all() 
-            : $user->projects;
+        // Super admins have access to all projects
+        if ($user->isSuperAdmin()) {
+            return Project::all();
+        }
+        
+        return $user->projects;
+    }
+    
+    /**
+     * Check if user is admin for a specific project
+     */
+    public function isAdminForProject(User $user, Project $project): bool
+    {
+        return $user->isAdminForProject($project);
+    }
+    
+    /**
+     * Get all projects where user is admin
+     */
+    public function getAdminProjects(User $user): Collection
+    {
+        return $user->projects()->wherePivot('role', User::ROLE_ADMIN)->get();
     }
 
     /**

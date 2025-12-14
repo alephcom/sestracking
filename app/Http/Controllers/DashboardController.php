@@ -30,15 +30,27 @@ class DashboardController extends Controller
         // SECURITY: Validate project access - never trust user input
         $requestedProjectId = $request->get('projectId');
         
-        if ($requestedProjectId === 'all' || !$requestedProjectId) {
+        if ($requestedProjectId === 'all' || !$requestedProjectId || empty($requestedProjectId)) {
             // Show all accessible projects
             $selectedProjectIds = $accessibleProjectIds;
         } else {
-            // Validate that user has access to the requested project
-            if (!in_array($requestedProjectId, $accessibleProjectIds)) {
-                return response()->json(['error' => 'Unauthorized access to project'], 403);
+            // Handle comma-separated project IDs for multi-select
+            if (is_string($requestedProjectId) && strpos($requestedProjectId, ',') !== false) {
+                $requestedIds = array_map('trim', explode(',', $requestedProjectId));
+            } else {
+                $requestedIds = [$requestedProjectId];
             }
-            $selectedProjectIds = [$requestedProjectId];
+            
+            // Filter to only include accessible project IDs
+            $selectedProjectIds = array_intersect(
+                array_map('intval', $requestedIds),
+                $accessibleProjectIds
+            );
+            
+            // If no valid projects selected, return empty result
+            if (empty($selectedProjectIds)) {
+                return response()->json(['error' => 'No accessible projects selected'], 403);
+            }
         }
 
         if (empty($selectedProjectIds)) {
@@ -93,30 +105,65 @@ class DashboardController extends Controller
         ];
 
         // Get chart data from new schema
-        $countersByDate = DB::table('recipient_events as re')
+        // Use database-agnostic approach by grouping in PHP to support both MySQL and SQLite
+        $events = DB::table('recipient_events as re')
             ->join('email_recipients as er', 're.recipient_id', '=', 'er.id')
             ->join('emails as e', 'er.email_id', '=', 'e.id')
-            ->select('re.type', DB::raw("COUNT(re.id) as count"), DB::raw("DATE_FORMAT(CONVERT_TZ(re.event_at, '+00:00', ?), '%Y-%m-%d') as daygroup"))
+            ->select('re.type', 're.event_at')
             ->whereIn('e.project_id', $selectedProjectIds)
             ->whereBetween('re.event_at', [$dateFrom, $dateTo])
-            ->addBinding(timezoneOffsetFormatter($request->tzOffset), 'select')
-            ->groupBy('daygroup', 're.type')
-            ->orderBy('daygroup', 'ASC')
             ->get();
 
+        // Group events by date (in user's timezone) and type
+        $tzOffset = (int)($request->tzOffset ?? 0); // minutes offset - cast to int
+        $grouped = [];
         $labels = [];
+        
+        foreach ($events as $event) {
+            // Convert timestamp to user's timezone
+            $eventDate = Carbon::parse($event->event_at);
+            if ($tzOffset != 0) {
+                $eventDate->addMinutes($tzOffset);
+            }
+            $daygroup = $eventDate->format('Y-m-d');
+            
+            $key = $daygroup . '_' . $event->type;
+            
+            if (!isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'daygroup' => $daygroup,
+                    'type' => $event->type,
+                    'count' => 0,
+                ];
+                $labels[$daygroup] = $daygroup;
+            }
+            
+            $grouped[$key]['count']++;
+        }
+        
+        // Sort by date
+        ksort($labels);
+        
+        // Build datasets grouped by type
         $datasets = [];
-        foreach ($countersByDate as $counter) {
-            $labels[$counter->daygroup] = $counter->daygroup;
-
-            if (empty($datasets[$counter->type])) {
-                $datasets[$counter->type] = [
-                    'label' => ucfirst($counter->type),
-                    'data' => [],
+        $labelsArray = array_values($labels);
+        
+        foreach ($grouped as $item) {
+            $type = $item['type'];
+            $daygroup = $item['daygroup'];
+            $count = $item['count'];
+            
+            if (empty($datasets[$type])) {
+                $datasets[$type] = [
+                    'label' => ucfirst($type),
+                    'data' => array_fill(0, count($labelsArray), 0),
                 ];
             }
-
-            $datasets[$counter->type]['data'][] = $counter->count;
+            
+            $index = array_search($daygroup, $labelsArray);
+            if ($index !== false) {
+                $datasets[$type]['data'][$index] = $count;
+            }
         }
 
         $chartData = [

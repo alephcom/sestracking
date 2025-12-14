@@ -11,7 +11,7 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
-    // Role constants
+    // Role constants for project_user pivot table
     const ROLE_ADMIN = 'admin';
     const ROLE_USER = 'user';
 
@@ -24,7 +24,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
-        'role',
+        'super_admin',
     ];
 
     /**
@@ -47,6 +47,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'super_admin' => 'boolean',
         ];
     }
 
@@ -55,15 +56,29 @@ class User extends Authenticatable
      */
     public function projects()
     {
-        return $this->belongsToMany(Project::class)->withTimestamps();
+        return $this->belongsToMany(Project::class)->withPivot('role')->withTimestamps();
     }
 
     /**
-     * Check if user is admin
+     * Check if user is super admin
      */
-    public function isAdmin(): bool
+    public function isSuperAdmin(): bool
     {
-        return $this->role === self::ROLE_ADMIN;
+        return $this->super_admin === true;
+    }
+
+    /**
+     * Check if user is admin for a specific project
+     */
+    public function isAdminForProject(Project $project): bool
+    {
+        // Super admins are admin for all projects
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+        
+        $project = $this->projects->find($project->id);
+        return $project && $project->pivot->role === self::ROLE_ADMIN;
     }
 
     /**
@@ -71,6 +86,37 @@ class User extends Authenticatable
      */
     public function hasAccessToProject(Project $project): bool
     {
-        return $this->isAdmin() || $this->projects->contains($project);
+        // Super admins have access to all projects
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+        
+        return $this->projects->contains($project);
+    }
+    
+    /**
+     * Check if user is admin for any project (including super admin)
+     */
+    public function isAdminForAnyProject(): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+        
+        return $this->projects()->wherePivot('role', self::ROLE_ADMIN)->exists();
+    }
+    
+    /**
+     * Get role for a specific project
+     */
+    public function getRoleForProject(Project $project): ?string
+    {
+        // Super admins are always admin for all projects
+        if ($this->isSuperAdmin()) {
+            return self::ROLE_ADMIN;
+        }
+        
+        $project = $this->projects->find($project->id);
+        return $project ? $project->pivot->role : null;
     }
 }

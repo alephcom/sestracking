@@ -47,30 +47,42 @@
             </div>
 
             <div class="form-group mb-3">
-                <label for="role">Role *</label>
-                <select name="role" id="role" class="form-control @error('role') is-invalid @enderror" required>
-                    <option value="">Select Role</option>
-                    <option value="user" {{ old('role') === 'user' ? 'selected' : '' }}>User</option>
-                    <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Admin</option>
-                </select>
-                @error('role')
-                    <div class="invalid-feedback">{{ $message }}</div>
-                @enderror
+                <div class="form-check">
+                    <input type="checkbox" name="super_admin" id="super_admin" value="1" 
+                           class="form-check-input @error('super_admin') is-invalid @enderror"
+                           {{ old('super_admin') ? 'checked' : '' }}>
+                    <label for="super_admin" class="form-check-label">
+                        Super Admin (has admin access to all projects)
+                    </label>
+                    @error('super_admin')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                    <small class="form-text text-muted d-block">
+                        Super admins have admin access to all projects automatically and don't need project assignments.
+                    </small>
+                </div>
             </div>
 
             <div class="form-group mb-3" id="projects-section">
-                <label>Assign Projects</label>
+                <label>Assign Projects & Roles</label>
                 <div class="row">
                     @foreach($projects as $project)
-                        <div class="col-md-6">
+                        <div class="col-md-6 mb-3">
                             <div class="form-check">
                                 <input type="checkbox" name="projects[]" value="{{ $project->id }}" 
-                                       id="project_{{ $project->id }}" class="form-check-input"
+                                       id="project_{{ $project->id }}" class="form-check-input project-checkbox"
                                        {{ in_array($project->id, old('projects', [])) ? 'checked' : '' }}>
                                 <label for="project_{{ $project->id }}" class="form-check-label">
                                     {{ $project->name }}
                                 </label>
                             </div>
+                            <select name="project_roles[{{ $project->id }}]" 
+                                    id="role_{{ $project->id }}" 
+                                    class="form-select form-select-sm mt-1 project-role-select"
+                                    disabled>
+                                <option value="user" {{ old("project_roles.{$project->id}", 'user') === 'user' ? 'selected' : '' }}>User</option>
+                                <option value="admin" {{ old("project_roles.{$project->id}", 'user') === 'admin' ? 'selected' : '' }}>Admin</option>
+                            </select>
                         </div>
                     @endforeach
                 </div>
@@ -78,7 +90,7 @@
                     <p class="text-muted">No projects available.</p>
                 @endif
                 <small class="form-text text-muted">
-                    Note: Admin users automatically have access to all projects.
+                    Select projects and assign roles. Users can be admin for some projects and regular users for others. (Not applicable for super admins)
                 </small>
             </div>
 
@@ -95,24 +107,43 @@
 </div>
 
 <script>
-document.getElementById('role').addEventListener('change', function() {
-    const projectsSection = document.getElementById('projects-section');
-    if (this.value === 'admin') {
-        projectsSection.style.display = 'none';
-        // Uncheck all project checkboxes for admins
-        const checkboxes = document.querySelectorAll('input[name="projects[]"]');
-        checkboxes.forEach(cb => cb.checked = false);
-    } else {
-        projectsSection.style.display = 'block';
-    }
-});
-
-// Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    const roleSelect = document.getElementById('role');
-    if (roleSelect.value === 'admin') {
-        document.getElementById('projects-section').style.display = 'none';
+    const superAdminCheckbox = document.getElementById('super_admin');
+    const projectsSection = document.getElementById('projects-section');
+    
+    // Handle super admin checkbox change
+    superAdminCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            projectsSection.style.display = 'none';
+            // Uncheck all projects
+            document.querySelectorAll('.project-checkbox').forEach(cb => cb.checked = false);
+        } else {
+            projectsSection.style.display = 'block';
+        }
+    });
+    
+    // Initialize on page load
+    if (superAdminCheckbox.checked) {
+        projectsSection.style.display = 'none';
     }
+    
+    // Handle project checkbox changes
+    const checkboxes = document.querySelectorAll('.project-checkbox');
+    checkboxes.forEach(function(checkbox) {
+        const projectId = checkbox.value;
+        const roleSelect = document.getElementById('role_' + projectId);
+        
+        // Enable/disable role select based on checkbox
+        checkbox.addEventListener('change', function() {
+            roleSelect.disabled = !this.checked;
+            if (!this.checked) {
+                roleSelect.value = 'user'; // Reset to default
+            }
+        });
+        
+        // Initialize on page load
+        roleSelect.disabled = !checkbox.checked;
+    });
 });
 </script>
 

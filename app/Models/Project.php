@@ -15,7 +15,17 @@ class Project extends Model
      */
     public function users()
     {
-        return $this->belongsToMany(User::class)->withTimestamps();
+        return $this->belongsToMany(User::class)->withPivot('role')->withTimestamps();
+    }
+    
+    /**
+     * Get admin users for this project
+     */
+    public function admins()
+    {
+        return $this->belongsToMany(User::class)
+            ->wherePivot('role', 'admin')
+            ->withTimestamps();
     }
 
     /**
