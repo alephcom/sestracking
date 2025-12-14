@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2025-12-14
+
+### Fixed
+- Production error: `Undefined array key "MessageId"` in SesWebhookController
+- Added validation for SNS notification MessageId before accessing it
+- Added validation for SNS Message field before decoding JSON
+- Improved error handling and logging for invalid webhook payloads
+- Webhook now returns proper error responses instead of throwing exceptions
+
 ## [0.2.5] - 2025-12-14
 
 ### Added
@@ -172,6 +181,7 @@ php artisan db:seed
 ## Contributors
 - Initial structure based on [SES Dashboard](https://github.com/Nikeev/sesdashboard) by Nikeev (MIT License)
 
+[0.2.6]: https://github.com/yourusername/sestracking/releases/tag/v0.2.6
 [0.2.5]: https://github.com/yourusername/sestracking/releases/tag/v0.2.5
 [0.2.4]: https://github.com/yourusername/sestracking/releases/tag/v0.2.4
 [0.2.3]: https://github.com/yourusername/sestracking/releases/tag/v0.2.3

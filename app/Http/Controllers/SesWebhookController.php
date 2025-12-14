@@ -27,12 +27,19 @@ class SesWebhookController extends Controller
 
         /* 1️⃣  Handle SNS handshake */
         if (($sns['Type'] ?? '') === 'SubscriptionConfirmation') {
-            Http::get($sns['SubscribeURL']);
+            Http::get($sns['SubscribeURL'] ?? '');
             return response('OK');
         }
 
+        // Validate that we have a MessageId for non-subscription messages
+        $messageId = $sns['MessageId'] ?? null;
+        if (!$messageId) {
+            Log::warning('SNS notification missing MessageId', ['sns_type' => $sns['Type'] ?? 'unknown', 'payload' => $sns]);
+            return response('Missing MessageId', 400);
+        }
+
         /* 2️⃣  Throw away duplicates immediately */
-        if (RecipientEvent::where('sns_message_id', $sns['MessageId'])->exists()) {
+        if (RecipientEvent::where('sns_message_id', $messageId)->exists()) {
             return response('Duplicate OK');
         }
 
@@ -40,7 +47,17 @@ class SesWebhookController extends Controller
         $project = Project::whereToken($token)->firstOrFail();
 
         /* 4️⃣  Inner SES payload */
-        $ses = json_decode($sns['Message'], true);
+        $message = $sns['Message'] ?? null;
+        if (!$message) {
+            Log::warning('SNS notification missing Message field', ['message_id' => $messageId, 'sns_type' => $sns['Type'] ?? 'unknown']);
+            return response('Missing Message', 400);
+        }
+
+        $ses = json_decode($message, true);
+        if (!$ses) {
+            Log::warning('SNS Message field contains invalid JSON', ['message_id' => $messageId, 'message' => $message]);
+            return response('Invalid Message JSON', 400);
+        }
 
         $email = Email::firstOrCreate(
             ['project_id' => $project->id, 'message_id' => $ses['mail']['messageId']],
@@ -82,7 +99,7 @@ class SesWebhookController extends Controller
             /* 6️⃣  Store the event for the selected recipient */
             RecipientEvent::create([
                 'recipient_id'   => $availableRecipient->id,
-                'sns_message_id' => $sns['MessageId'],
+                'sns_message_id' => $messageId,
                 'type'           => $type,
                 'event_at'       => Carbon::parse(
                     $ses[$type]['timestamp'] ?? $ses['mail']['timestamp']
@@ -105,7 +122,7 @@ class SesWebhookController extends Controller
                 /* 6️⃣  Store the event once per recipient */
                 RecipientEvent::create([
                     'recipient_id'   => $recipient->id,
-                    'sns_message_id' => $sns['MessageId'],
+                    'sns_message_id' => $messageId,
                     'type'           => $type,
                     'event_at'       => Carbon::parse(
                         $ses[$type]['timestamp'] ?? $ses['mail']['timestamp']
