@@ -70,7 +70,7 @@
       <footer class="footer mt-auto py-4 text-muted">
         <div class="d-flex justify-content-between align-items-center">
           <div>
-            © {{ 'now'|date('Y') }} <a href="https://sesdashboard.com/" target="_blank">SES Tracking</a>
+            © {{ 'now'|date('Y') }} <a href="https://github.com/alephcom/sestracking" target="_blank">SES Tracking</a>
           </div>
           <div class="text-muted small">
             <i class="fas fa-heart text-danger"></i> Built with modern design
