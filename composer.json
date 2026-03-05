@@ -10,6 +10,7 @@
         "box/spout": "^3.3",
         "laravel/framework": "^11.0",
         "laravel/tinker": "^2.9",
+        "sentry/sentry-laravel": "^4.21",
         "swiftmailer/swiftmailer": "^5.4"
     },
     "require-dev": {
