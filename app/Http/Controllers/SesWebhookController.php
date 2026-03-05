@@ -10,6 +10,22 @@ use App\Models\{Project, Email, EmailRecipient, RecipientEvent};
 
 class SesWebhookController extends Controller
 {
+    /**
+     * Map SES eventType (PascalCase or lowercase) to stored enum value.
+     */
+    private const SES_EVENT_TYPE_TO_ENUM = [
+        'Send' => 'send', 'send' => 'send',
+        'RenderingFailure' => 'rendering_failure', 'renderingfailure' => 'rendering_failure', 'rendering_failure' => 'rendering_failure',
+        'Reject' => 'reject', 'reject' => 'reject',
+        'Delivery' => 'delivery', 'delivery' => 'delivery',
+        'Bounce' => 'bounce', 'bounce' => 'bounce',
+        'Complaint' => 'complaint', 'complaint' => 'complaint',
+        'DeliveryDelay' => 'delivery_delay', 'deliverydelay' => 'delivery_delay', 'delivery_delay' => 'delivery_delay',
+        'Subscription' => 'subscription', 'subscription' => 'subscription',
+        'Open' => 'open', 'open' => 'open',
+        'Click' => 'click', 'click' => 'click',
+    ];
+
     public function __invoke(Request $request, string $token)
     {
         // Debug: Log incoming payload to webhook_debug.log (if enabled)
@@ -68,10 +84,11 @@ class SesWebhookController extends Controller
             $sesMessageId = $ses['mail']['messageId'] ?? null;
             $timestamp = $ses['mail']['timestamp'] ?? now()->toIso8601String();
             $eventType = $ses['eventType'] ?? 'unknown';
+            $payloadKey = lcfirst($eventType); // SES uses camelCase keys (e.g. deliveryDelay, renderingFailure)
             
             if ($sesMessageId) {
                 // Create a unique ID combining messageId, eventType, and timestamp for deduplication
-                $messageId = 'ses-' . md5($sesMessageId . '-' . $eventType . '-' . ($ses[$eventType]['timestamp'] ?? $timestamp));
+                $messageId = 'ses-' . md5($sesMessageId . '-' . $eventType . '-' . ($ses[$payloadKey]['timestamp'] ?? $timestamp));
             } else {
                 // Fallback: generate from payload hash
                 $messageId = 'ses-' . md5(json_encode($ses));
@@ -95,7 +112,9 @@ class SesWebhookController extends Controller
         );
 
         /* 5️⃣  Which event and which recipients? */
-        $type = strtolower($ses['eventType'] ?? ($ses['notificationType'] ?? 'unknown'));
+        $rawEventType = $ses['eventType'] ?? $ses['notificationType'] ?? 'unknown';
+        $type = self::SES_EVENT_TYPE_TO_ENUM[$rawEventType] ?? self::SES_EVENT_TYPE_TO_ENUM[strtolower($rawEventType)] ?? 'unknown';
+        $payloadKey = lcfirst($rawEventType); // SES payload uses camelCase (e.g. deliveryDelay, renderingFailure)
 
         // Special handling for open/click events - assign to first available recipient
         if (in_array($type, ['open', 'click'])) {
@@ -131,7 +150,7 @@ class SesWebhookController extends Controller
                 ],
                 [
                     'event_at'       => Carbon::parse(
-                        $ses[$type]['timestamp'] ?? $ses['mail']['timestamp']
+                        $ses[$payloadKey]['timestamp'] ?? $ses['mail']['timestamp']
                     ),
                     'payload'        => $ses,
                 ]
@@ -145,6 +164,8 @@ class SesWebhookController extends Controller
             // For bounce events, recipients are in bounce.bouncedRecipients[].emailAddress
             if ($type === 'bounce' && isset($ses['bounce']['bouncedRecipients'])) {
                 $recipientAddresses = array_column($ses['bounce']['bouncedRecipients'], 'emailAddress');
+            } elseif ($type === 'delivery_delay' && isset($ses['deliveryDelay']['delayedRecipients'])) {
+                $recipientAddresses = array_column($ses['deliveryDelay']['delayedRecipients'], 'emailAddress');
             } else {
                 // For other event types, use delivery.recipients or mail.destination
                 $recipientAddresses = $ses['delivery']['recipients'] ?? $ses['mail']['destination'] ?? [];
@@ -162,15 +183,10 @@ class SesWebhookController extends Controller
                 );
 
                 /* 6️⃣  Store the event once per recipient (use firstOrCreate to handle duplicates) */
-                // Determine event timestamp based on event type
-                $eventTimestamp = null;
-                if ($type === 'bounce' && isset($ses['bounce']['timestamp'])) {
-                    $eventTimestamp = Carbon::parse($ses['bounce']['timestamp']);
-                } elseif (isset($ses[$type]['timestamp'])) {
-                    $eventTimestamp = Carbon::parse($ses[$type]['timestamp']);
-                } else {
-                    $eventTimestamp = Carbon::parse($ses['mail']['timestamp'] ?? now());
-                }
+                // Determine event timestamp from event-specific payload key (camelCase) or mail
+                $eventTimestamp = isset($ses[$payloadKey]['timestamp'])
+                    ? Carbon::parse($ses[$payloadKey]['timestamp'])
+                    : Carbon::parse($ses['mail']['timestamp'] ?? now());
                 
                 RecipientEvent::firstOrCreate(
                     [

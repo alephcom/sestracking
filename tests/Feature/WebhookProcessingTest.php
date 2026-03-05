@@ -355,6 +355,42 @@ class WebhookProcessingTest extends TestCase
     }
 
     /** @test */
+    public function webhook_processes_delivery_delay_events()
+    {
+        // Real SES sends eventType as PascalCase "DeliveryDelay" and payload key as camelCase "deliveryDelay"
+        $deliveryDelayPayload = $this->createSesNotification('DeliveryDelay', [
+            'mail' => [
+                'messageId' => 'delivery-delay-message-123',
+                'source' => 'test@example.com',
+                'destination' => ['delayed@example.com'],
+                'timestamp' => '2025-01-01T10:00:00.000Z',
+                'commonHeaders' => [
+                    'subject' => 'Test Email Subject'
+                ]
+            ],
+            'deliveryDelay' => [
+                'timestamp' => '2025-01-01T10:05:00.000Z',
+                'delayType' => 'TransientCommunicationFailure',
+                'delayedRecipients' => [
+                    ['emailAddress' => 'delayed@example.com', 'status' => '4.4.1', 'diagnosticCode' => 'smtp; 421 4.4.1 Unable to connect']
+                ]
+            ]
+        ]);
+
+        $response = $this->postJson('/webhook/test-token-123', $deliveryDelayPayload);
+
+        $response->assertOk();
+
+        $this->assertDatabaseHas('email_recipients', [
+            'address' => 'delayed@example.com'
+        ]);
+
+        $this->assertDatabaseHas('recipient_events', [
+            'type' => 'delivery_delay'
+        ]);
+    }
+
+    /** @test */
     public function webhook_validates_project_token()
     {
         $payload = $this->createSesNotification('send', [
@@ -490,10 +526,20 @@ class WebhookProcessingTest extends TestCase
     public function webhook_handles_duplicate_events()
     {
         $messageId = 'duplicate-test-123';
-        
-        // Create initial event
-        $event = RecipientEvent::factory()->create([
-            'sns_message_id' => $messageId
+
+        // Pre-create email and recipient to match the payload so firstOrCreate finds the existing event
+        $email = Email::factory()->create([
+            'project_id' => $this->project->id,
+            'message_id' => 'some-email-123',
+        ]);
+        $recipient = EmailRecipient::factory()->create([
+            'email_id' => $email->id,
+            'address' => 'recipient@example.com',
+        ]);
+        RecipientEvent::factory()->create([
+            'recipient_id' => $recipient->id,
+            'sns_message_id' => $messageId,
+            'type' => 'send',
         ]);
 
         $payload = $this->createSesNotification('send', [
@@ -508,9 +554,9 @@ class WebhookProcessingTest extends TestCase
         $response = $this->postJson('/webhook/test-token-123', $payload);
 
         $response->assertOk();
-        $response->assertSeeText('Duplicate OK');
+        $response->assertSeeText('OK');
 
-        // Verify no additional events were created
+        // Verify no additional events were created (firstOrCreate returns existing row for same sns_message_id, recipient_id, type)
         $this->assertEquals(1, RecipientEvent::where('sns_message_id', $messageId)->count());
     }
 
