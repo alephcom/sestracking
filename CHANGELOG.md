@@ -8,6 +8,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Mobile offcanvas navigation: hamburger button in the navbar on small screens opens a full Bootstrap 5 offcanvas panel with all nav sections (Dashboard, Activity, Reports, Settings, Admin)
+- Dashboard project selector replaced with a checkbox dropdown — individual projects can be toggled without Ctrl+click; "All Projects" auto-deselects when specific projects are chosen and vice versa
+- Date Range label with calendar icon above the dashboard date inputs
+- Loading spinner in the dashboard counters area while data is being fetched
+- Inline dismissible `alert-danger` error messages on the dashboard (replaces blocking `alert()` dialogs)
+- Record count ("Showing 1–10 of 243 results") displayed above pagination on the Activity page
+- Enter-key support in the Activity search field triggers a search
+
+### Changed
+- Dashboard counter cards redesigned: each stat now shows a large contextual icon (envelope, check-circle, eye, mouse-pointer, exclamation-circle) with a matching color, laid out in a fluid responsive grid
+- Dashboard "Bounce" chart color changed from near-invisible light gray (`#c8c8c8`) to amber (`#f59e0b`); "Click" color changed to purple (`#8b5cf6`) for clearer line distinction
+- Activity filter bar reorganized into two rows — search + date range + clear button on row 1; event type + search + export on row 2 — eliminating the cramped four-equal-column layout
+- Changing the date range or event type filter on the Activity page now auto-triggers a data reload instead of requiring a separate Search button click
+- Activity status column uses Bootstrap badges (`Delivered`, `Bounced`, `Complained`, etc.) instead of `fa-dot-circle` icons
+- Activity "Message" column shows subject as semibold text with the destination address(es) as small muted text below, reducing row height
+- Activity empty state shows a centered inbox icon with guidance text instead of a plain text message
+- Activity modal timestamps show formatted local time only; raw UTC string moved to the `title` tooltip attribute accessible on hover
+- Dashboard and Activity main content area widened to `col-12` on mobile so it fills the screen when the sidebar is hidden
+- Chart.js tooltip and interaction options corrected from v2 API format to v3 (`plugins.tooltip`, `interaction`) — chart tooltips were silently broken
+
+### Added
 - Welcome page at `/` explaining the app's purpose, features, and linking to the GitHub repository; shows Log In button for guests and Dashboard link for authenticated users
 - Google and Microsoft SSO via `laravel/socialite` and `socialiteproviders/microsoft`; set `GOOGLE_CLIENT_ID` / `MICROSOFT_CLIENT_ID` env keys to enable each provider independently
 - SSO buttons on the login page are conditionally rendered — only providers with credentials configured in `.env` are shown

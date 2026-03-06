@@ -18,7 +18,13 @@
 <body class="h-100">
 <nav class="navbar navbar-dark fixed-top bg-colored flex-md-nowrap p-0 shadow-sm">
   <div class="d-flex align-items-center">
-    <button class="btn btn-link text-white ms-2 d-md-block d-none" id="sidebarToggle" type="button" aria-label="Toggle sidebar">
+    {{-- Desktop sidebar toggle --}}
+    <button class="btn btn-link text-white ms-2 d-none d-md-block" id="sidebarToggle" type="button" aria-label="Toggle sidebar">
+      <i class="fas fa-bars"></i>
+    </button>
+    {{-- Mobile offcanvas toggle --}}
+    <button class="btn btn-link text-white ms-2 d-md-none" type="button"
+            data-bs-toggle="offcanvas" data-bs-target="#mobileNav" aria-controls="mobileNav" aria-label="Open menu">
       <i class="fas fa-bars"></i>
     </button>
     <a class="navbar-brand" href="/">
@@ -35,11 +41,84 @@
   </ul>
 </nav>
 
+{{-- Mobile offcanvas sidebar --}}
+<div class="offcanvas offcanvas-start" tabindex="-1" id="mobileNav" aria-labelledby="mobileNavLabel" style="width: 280px; padding-top: 56px;">
+  <div class="offcanvas-header border-bottom py-3">
+    <h6 class="offcanvas-title fw-bold text-dark" id="mobileNavLabel">
+      <i class="fas fa-chart-line me-2 text-primary"></i>SES Tracking
+    </h6>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body p-0">
+    <ul class="nav flex-column pt-2">
+      <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('dashboard.index') ? 'active' : '' }}" href="{{ route('dashboard.index') }}">
+          <i class="fas fa-tachometer-alt"></i><span>Dashboard</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('activity') ? 'active' : '' }}" href="{{ route('activity') }}">
+          <i class="fas fa-list"></i><span>Activity</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('reports.*') ? 'active' : '' }}" href="{{ route('reports.index') }}">
+          <i class="fas fa-folder-open"></i><span>Reports</span>
+        </a>
+      </li>
+    </ul>
+
+    <h6 class="sidebar-heading"><span>Settings</span></h6>
+    <ul class="nav flex-column mb-2">
+      <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('send_test') ? 'active' : '' }}" href="{{ route('send_test') }}">
+          <i class="far fa-paper-plane"></i><span>Send Test Mail</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('edit_profile') ? 'active' : '' }}" href="{{ route('edit_profile') }}">
+          <i class="fas fa-user-cog"></i><span>Account</span>
+        </a>
+      </li>
+      @if(!auth()->user()->isSuperAdmin())
+      <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('project-requests.create') ? 'active' : '' }}" href="{{ route('project-requests.create') }}">
+          <i class="fas fa-hand-paper"></i><span>Request Project</span>
+        </a>
+      </li>
+      @endif
+    </ul>
+
+    @if(auth()->user()->isSuperAdmin() || auth()->user()->isAdminForAnyProject())
+    <h6 class="sidebar-heading"><span>Admin</span></h6>
+    <ul class="nav flex-column mb-2">
+      @if(auth()->user()->isSuperAdmin())
+      <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('project-requests.*') ? 'active' : '' }}" href="{{ route('project-requests.index') }}">
+          <i class="fas fa-clipboard-list"></i><span>Project Requests</span>
+        </a>
+      </li>
+      @endif
+      <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.projects.*') ? 'active' : '' }}" href="{{ route('admin.projects.index') }}">
+          <i class="fas fa-project-diagram"></i><span>Manage Projects</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}">
+          <i class="fas fa-users"></i><span>Manage Users</span>
+        </a>
+      </li>
+    </ul>
+    @endif
+  </div>
+</div>
+
 <div class="container-fluid h-100">
   <div class="row h-100" style="padding-top: 56px;">
     @include('layouts/sidebar')
 
-    <main role="main" class="col-md-9 px-4 h-100 d-flex flex-column">
+    <main role="main" class="col-12 col-md-9 px-3 px-md-4 h-100 d-flex flex-column">
       <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-4 pb-3 mb-4 border-bottom">
        @yield('h1')
       </div>

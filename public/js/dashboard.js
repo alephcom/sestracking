@@ -42620,8 +42620,6 @@ function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length)
 
 chart_js__WEBPACK_IMPORTED_MODULE_1__.Chart.register.apply(chart_js__WEBPACK_IMPORTED_MODULE_1__.Chart, _toConsumableArray(chart_js__WEBPACK_IMPORTED_MODULE_1__.registerables));
 
-
-// Dashboard Application
 var DashboardApp = /*#__PURE__*/function () {
   function DashboardApp() {
     _classCallCheck(this, DashboardApp);
@@ -42637,27 +42635,20 @@ var DashboardApp = /*#__PURE__*/function () {
       Send: '#6c757d',
       Delivery: '#28a745',
       Reject: '#db5b67',
-      Bounce: '#c8c8c8',
+      Bounce: '#f59e0b',
       Complaint: '#dc3545',
       Failure: '#e59aa2',
       Open: '#007bff',
-      Click: '#ffc107'
+      Click: '#8b5cf6'
     };
     this.init();
   }
   return _createClass(DashboardApp, [{
     key: "init",
     value: function init() {
-      // Create DOM structure
       this.createDOM();
-
-      // Setup date range picker
       this.setupDateRangePicker();
-
-      // Expose to window for external control
       window.dashboardVueInstance = this;
-
-      // Load initial data
       if (this.projectId) {
         this.loadData();
       }
@@ -42667,7 +42658,7 @@ var DashboardApp = /*#__PURE__*/function () {
     value: function createDOM() {
       var appContainer = document.getElementById('app');
       if (!appContainer) return;
-      appContainer.innerHTML = "\n      <div class=\"mb-4 w-25\">\n        <div class=\"input-group\">\n          <input type=\"date\" id=\"date-from\" class=\"form-control\" />\n          <span class=\"input-group-text\">to</span>\n          <input type=\"date\" id=\"date-to\" class=\"form-control\" />\n        </div>\n      </div>\n\n      <div id=\"counters-cards\"></div>\n\n      <div class=\"small mb-5\" style=\"position: relative; height: 300px;\">\n        <canvas id=\"line-chart\"></canvas>\n      </div>\n    ";
+      appContainer.innerHTML = "\n      <div class=\"mb-4\">\n        <label class=\"form-label fw-semibold text-muted small text-uppercase letter-spacing-1 mb-2\">\n          <i class=\"fas fa-calendar-alt me-1\"></i>Date Range\n        </label>\n        <div class=\"input-group\" style=\"max-width: 360px;\">\n          <input type=\"date\" id=\"date-from\" class=\"form-control\" />\n          <span class=\"input-group-text\">to</span>\n          <input type=\"date\" id=\"date-to\" class=\"form-control\" />\n        </div>\n      </div>\n\n      <div id=\"error-container\"></div>\n      <div id=\"counters-cards\"></div>\n\n      <div class=\"small mb-5\" style=\"position: relative; height: 300px;\">\n        <canvas id=\"line-chart\"></canvas>\n      </div>\n    ";
       this.chartCanvas = document.getElementById('line-chart');
     }
   }, {
@@ -42690,9 +42681,33 @@ var DashboardApp = /*#__PURE__*/function () {
       }
     }
   }, {
+    key: "renderLoading",
+    value: function renderLoading() {
+      var countersContainer = document.getElementById('counters-cards');
+      if (countersContainer) {
+        countersContainer.innerHTML = "\n        <div class=\"text-center my-4\">\n          <div class=\"spinner-border text-primary\" role=\"status\">\n            <span class=\"visually-hidden\">Loading...</span>\n          </div>\n        </div>\n      ";
+      }
+    }
+  }, {
+    key: "renderError",
+    value: function renderError(message) {
+      var errorContainer = document.getElementById('error-container');
+      if (errorContainer) {
+        errorContainer.innerHTML = "\n        <div class=\"alert alert-danger alert-dismissible fade show\" role=\"alert\">\n          <i class=\"fas fa-exclamation-triangle me-2\"></i>".concat(message, "\n          <button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"alert\" aria-label=\"Close\"></button>\n        </div>\n      ");
+      }
+    }
+  }, {
+    key: "clearError",
+    value: function clearError() {
+      var errorContainer = document.getElementById('error-container');
+      if (errorContainer) errorContainer.innerHTML = '';
+    }
+  }, {
     key: "loadData",
     value: function loadData() {
       var _this2 = this;
+      this.clearError();
+      this.renderLoading();
       axios__WEBPACK_IMPORTED_MODULE_3__["default"].get(window.dashboardEndpoint, {
         params: {
           projectId: this.projectId,
@@ -42705,11 +42720,11 @@ var DashboardApp = /*#__PURE__*/function () {
         _this2.renderCounters();
         _this2.fillChartData(response.data.chartData);
       })["catch"](function (error) {
-        if (error.response) {
-          alert(error.response.data.error);
-        } else {
-          alert(error);
-        }
+        var _error$response;
+        var message = ((_error$response = error.response) === null || _error$response === void 0 || (_error$response = _error$response.data) === null || _error$response === void 0 ? void 0 : _error$response.error) || 'An error occurred loading dashboard data. Please try again.';
+        _this2.renderError(message);
+        var countersContainer = document.getElementById('counters-cards');
+        if (countersContainer) countersContainer.innerHTML = '';
       });
     }
   }, {
@@ -42722,64 +42737,66 @@ var DashboardApp = /*#__PURE__*/function () {
       var opens = this.counters.opens || 0;
       var clicks = this.counters.clicks || 0;
       var notDelivered = this.counters.notDelivered || 0;
-      var deliveredPercent = sent ? (delivered / sent * 100).toFixed(2) : 0;
-      var notDeliveredPercent = sent ? (notDelivered / sent * 100).toFixed(2) : 0;
-      var formatNumber = function formatNumber(num) {
+      var deliveredPercent = sent ? (delivered / sent * 100).toFixed(1) : 0;
+      var notDeliveredPercent = sent ? (notDelivered / sent * 100).toFixed(1) : 0;
+      var fmt = function fmt(num) {
         return new Intl.NumberFormat([], {
           maximumFractionDigits: 2
         }).format(num);
       };
-      countersContainer.innerHTML = "\n      <div class=\"card-deck mb-5 d-flex justify-content-center\">\n        <div class=\"card bg-light text-center col-md-2 col-sm-6 m-2\">\n          <div class=\"card-body\">\n            <h6 class=\"text-uppercase\">Sent</h6>\n            <h3 class=\"text-muted\">".concat(formatNumber(sent), "</h3>\n          </div>\n        </div>\n\n        <div class=\"card bg-light text-center col-md-2 col-sm-6 m-2\">\n          <div class=\"card-body\">\n            <h6 class=\"text-uppercase\">Delivered</h6>\n            <h4 class=\"text-success mb-0\">").concat(formatNumber(delivered), "</h4>\n            <div class=\"text-muted\">").concat(formatNumber(deliveredPercent), "%</div>\n          </div>\n        </div>\n\n        <div class=\"card bg-light text-center col-md-2 col-sm-6 m-2\">\n          <div class=\"card-body\">\n            <h6 class=\"text-uppercase\">Opens</h6>\n            <h4 class=\"text-primary\">").concat(formatNumber(opens), "</h4>\n          </div>\n        </div>\n\n        <div class=\"card bg-light text-center col-md-2 col-sm-6 m-2\">\n          <div class=\"card-body\">\n            <h6 class=\"text-uppercase\">Clicks</h6>\n            <h4 class=\"text-warning\">").concat(formatNumber(clicks), "</h4>\n          </div>\n        </div>\n\n        <div class=\"card bg-light text-center col-md-2 col-sm-6 m-2\">\n          <div class=\"card-body\">\n            <h6 class=\"text-uppercase\">Not Delivered</h6>\n            <h4 class=\"text-danger mb-0\">").concat(formatNumber(notDelivered), "</h4>\n            <div class=\"text-muted\">").concat(formatNumber(notDeliveredPercent), "%</div>\n          </div>\n        </div>\n      </div>\n    ");
+      countersContainer.innerHTML = "\n      <div class=\"row g-3 mb-5\">\n        <div class=\"col-6 col-md\">\n          <div class=\"card text-center h-100\">\n            <div class=\"card-body py-4\">\n              <i class=\"fas fa-envelope fa-2x text-secondary mb-3\"></i>\n              <div class=\"text-uppercase text-muted small fw-semibold mb-1\">Sent</div>\n              <div class=\"fs-3 fw-bold text-dark\">".concat(fmt(sent), "</div>\n            </div>\n          </div>\n        </div>\n\n        <div class=\"col-6 col-md\">\n          <div class=\"card text-center h-100\">\n            <div class=\"card-body py-4\">\n              <i class=\"fas fa-check-circle fa-2x text-success mb-3\"></i>\n              <div class=\"text-uppercase text-muted small fw-semibold mb-1\">Delivered</div>\n              <div class=\"fs-3 fw-bold text-success\">").concat(fmt(delivered), "</div>\n              <div class=\"text-muted small\">").concat(fmt(deliveredPercent), "%</div>\n            </div>\n          </div>\n        </div>\n\n        <div class=\"col-6 col-md\">\n          <div class=\"card text-center h-100\">\n            <div class=\"card-body py-4\">\n              <i class=\"fas fa-eye fa-2x text-primary mb-3\"></i>\n              <div class=\"text-uppercase text-muted small fw-semibold mb-1\">Opens</div>\n              <div class=\"fs-3 fw-bold text-primary\">").concat(fmt(opens), "</div>\n            </div>\n          </div>\n        </div>\n\n        <div class=\"col-6 col-md\">\n          <div class=\"card text-center h-100\">\n            <div class=\"card-body py-4\">\n              <i class=\"fas fa-mouse-pointer fa-2x mb-3\" style=\"color: #8b5cf6;\"></i>\n              <div class=\"text-uppercase text-muted small fw-semibold mb-1\">Clicks</div>\n              <div class=\"fs-3 fw-bold\" style=\"color: #8b5cf6;\">").concat(fmt(clicks), "</div>\n            </div>\n          </div>\n        </div>\n\n        <div class=\"col-6 col-md\">\n          <div class=\"card text-center h-100\">\n            <div class=\"card-body py-4\">\n              <i class=\"fas fa-exclamation-circle fa-2x text-danger mb-3\"></i>\n              <div class=\"text-uppercase text-muted small fw-semibold mb-1\">Not Delivered</div>\n              <div class=\"fs-3 fw-bold text-danger\">").concat(fmt(notDelivered), "</div>\n              <div class=\"text-muted small\">").concat(fmt(notDeliveredPercent), "%</div>\n            </div>\n          </div>\n        </div>\n      </div>\n    ");
     }
   }, {
     key: "fillChartData",
     value: function fillChartData(data) {
       var _this3 = this;
-      var datasets = [];
-      data.datasets.forEach(function (element) {
-        datasets.push({
+      var datasets = data.datasets.map(function (element) {
+        return {
           label: element.label,
           data: element.data,
           backgroundColor: _this3.chartColors[element.label],
           borderColor: _this3.chartColors[element.label],
-          fill: false
-        });
+          fill: false,
+          tension: 0.3,
+          pointRadius: 3,
+          pointHoverRadius: 5
+        };
       });
       var labels = data.labels.map(function (label) {
         return moment__WEBPACK_IMPORTED_MODULE_0___default()(label).format('L');
       });
-      var chartData = {
-        labels: labels,
-        datasets: datasets
-      };
-      var options = {
-        responsive: true,
-        maintainAspectRatio: false,
-        tooltips: {
-          mode: 'index',
-          intersect: false
-        },
-        hover: {
-          mode: 'nearest',
-          intersect: true
-        }
-      };
       if (this.chart) {
         this.chart.destroy();
       }
       if (this.chartCanvas) {
         this.chart = new chart_js__WEBPACK_IMPORTED_MODULE_1__.Chart(this.chartCanvas, {
           type: 'line',
-          data: chartData,
-          options: options
+          data: {
+            labels: labels,
+            datasets: datasets
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              tooltip: {
+                mode: 'index',
+                intersect: false
+              }
+            },
+            interaction: {
+              mode: 'nearest',
+              intersect: true
+            }
+          }
         });
       }
     }
   }]);
-}(); // Initialize when DOM is ready
+}();
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function () {
-    new DashboardApp();
+    return new DashboardApp();
   });
 } else {
   new DashboardApp();

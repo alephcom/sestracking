@@ -4,7 +4,6 @@ import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 import './bootstrap';
 
-// Dashboard Application
 class DashboardApp {
   constructor() {
     this.projectId = window.dashboardProjectId || 'all';
@@ -16,30 +15,23 @@ class DashboardApp {
     this.chart = null;
     this.chartCanvas = null;
     this.chartColors = {
-      Send: '#6c757d',
-      Delivery: '#28a745',
-      Reject: '#db5b67',
-      Bounce: '#c8c8c8',
+      Send:      '#6c757d',
+      Delivery:  '#28a745',
+      Reject:    '#db5b67',
+      Bounce:    '#f59e0b',
       Complaint: '#dc3545',
-      Failure: '#e59aa2',
-      Open: '#007bff',
-      Click: '#ffc107'
+      Failure:   '#e59aa2',
+      Open:      '#007bff',
+      Click:     '#8b5cf6'
     };
-    
+
     this.init();
   }
 
   init() {
-    // Create DOM structure
     this.createDOM();
-    
-    // Setup date range picker
     this.setupDateRangePicker();
-    
-    // Expose to window for external control
     window.dashboardVueInstance = this;
-    
-    // Load initial data
     if (this.projectId) {
       this.loadData();
     }
@@ -50,14 +42,18 @@ class DashboardApp {
     if (!appContainer) return;
 
     appContainer.innerHTML = `
-      <div class="mb-4 w-25">
-        <div class="input-group">
+      <div class="mb-4">
+        <label class="form-label fw-semibold text-muted small text-uppercase letter-spacing-1 mb-2">
+          <i class="fas fa-calendar-alt me-1"></i>Date Range
+        </label>
+        <div class="input-group" style="max-width: 360px;">
           <input type="date" id="date-from" class="form-control" />
           <span class="input-group-text">to</span>
           <input type="date" id="date-to" class="form-control" />
         </div>
       </div>
 
+      <div id="error-container"></div>
       <div id="counters-cards"></div>
 
       <div class="small mb-5" style="position: relative; height: 300px;">
@@ -70,11 +66,11 @@ class DashboardApp {
 
   setupDateRangePicker() {
     const dateFromInput = document.getElementById('date-from');
-    const dateToInput = document.getElementById('date-to');
+    const dateToInput   = document.getElementById('date-to');
 
     if (dateFromInput && dateToInput) {
       dateFromInput.value = moment(this.dateRange.startDate).format('YYYY-MM-DD');
-      dateToInput.value = moment(this.dateRange.endDate).format('YYYY-MM-DD');
+      dateToInput.value   = moment(this.dateRange.endDate).format('YYYY-MM-DD');
 
       dateFromInput.addEventListener('change', () => {
         this.dateRange.startDate = moment(dateFromInput.value).toDate();
@@ -88,13 +84,46 @@ class DashboardApp {
     }
   }
 
+  renderLoading() {
+    const countersContainer = document.getElementById('counters-cards');
+    if (countersContainer) {
+      countersContainer.innerHTML = `
+        <div class="text-center my-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  renderError(message) {
+    const errorContainer = document.getElementById('error-container');
+    if (errorContainer) {
+      errorContainer.innerHTML = `
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+          <i class="fas fa-exclamation-triangle me-2"></i>${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      `;
+    }
+  }
+
+  clearError() {
+    const errorContainer = document.getElementById('error-container');
+    if (errorContainer) errorContainer.innerHTML = '';
+  }
+
   loadData() {
+    this.clearError();
+    this.renderLoading();
+
     axios.get(window.dashboardEndpoint, {
       params: {
         projectId: this.projectId,
-        dateFrom: moment(this.dateRange.startDate).startOf('day').utc().toDate(),
-        dateTo: moment(this.dateRange.endDate).endOf('day').utc().toDate(),
-        tzOffset: moment().utcOffset()
+        dateFrom:  moment(this.dateRange.startDate).startOf('day').utc().toDate(),
+        dateTo:    moment(this.dateRange.endDate).endOf('day').utc().toDate(),
+        tzOffset:  moment().utcOffset()
       }
     })
       .then(response => {
@@ -103,11 +132,10 @@ class DashboardApp {
         this.fillChartData(response.data.chartData);
       })
       .catch(error => {
-        if (error.response) {
-          alert(error.response.data.error);
-        } else {
-          alert(error);
-        }
+        const message = error.response?.data?.error || 'An error occurred loading dashboard data. Please try again.';
+        this.renderError(message);
+        const countersContainer = document.getElementById('counters-cards');
+        if (countersContainer) countersContainer.innerHTML = '';
       });
   }
 
@@ -115,55 +143,68 @@ class DashboardApp {
     const countersContainer = document.getElementById('counters-cards');
     if (!countersContainer) return;
 
-    const sent = this.counters.sent || 0;
-    const delivered = this.counters.delivered || 0;
-    const opens = this.counters.opens || 0;
-    const clicks = this.counters.clicks || 0;
+    const sent         = this.counters.sent         || 0;
+    const delivered    = this.counters.delivered    || 0;
+    const opens        = this.counters.opens        || 0;
+    const clicks       = this.counters.clicks       || 0;
     const notDelivered = this.counters.notDelivered || 0;
-    
-    const deliveredPercent = sent ? ((delivered / sent) * 100).toFixed(2) : 0;
-    const notDeliveredPercent = sent ? ((notDelivered / sent) * 100).toFixed(2) : 0;
 
-    const formatNumber = (num) => {
-      return new Intl.NumberFormat([], {maximumFractionDigits: 2}).format(num);
-    };
+    const deliveredPercent    = sent ? ((delivered    / sent) * 100).toFixed(1) : 0;
+    const notDeliveredPercent = sent ? ((notDelivered / sent) * 100).toFixed(1) : 0;
+
+    const fmt = (num) => new Intl.NumberFormat([], { maximumFractionDigits: 2 }).format(num);
 
     countersContainer.innerHTML = `
-      <div class="card-deck mb-5 d-flex justify-content-center">
-        <div class="card bg-light text-center col-md-2 col-sm-6 m-2">
-          <div class="card-body">
-            <h6 class="text-uppercase">Sent</h6>
-            <h3 class="text-muted">${formatNumber(sent)}</h3>
+      <div class="row g-3 mb-5">
+        <div class="col-6 col-md">
+          <div class="card text-center h-100">
+            <div class="card-body py-4">
+              <i class="fas fa-envelope fa-2x text-secondary mb-3"></i>
+              <div class="text-uppercase text-muted small fw-semibold mb-1">Sent</div>
+              <div class="fs-3 fw-bold text-dark">${fmt(sent)}</div>
+            </div>
           </div>
         </div>
 
-        <div class="card bg-light text-center col-md-2 col-sm-6 m-2">
-          <div class="card-body">
-            <h6 class="text-uppercase">Delivered</h6>
-            <h4 class="text-success mb-0">${formatNumber(delivered)}</h4>
-            <div class="text-muted">${formatNumber(deliveredPercent)}%</div>
+        <div class="col-6 col-md">
+          <div class="card text-center h-100">
+            <div class="card-body py-4">
+              <i class="fas fa-check-circle fa-2x text-success mb-3"></i>
+              <div class="text-uppercase text-muted small fw-semibold mb-1">Delivered</div>
+              <div class="fs-3 fw-bold text-success">${fmt(delivered)}</div>
+              <div class="text-muted small">${fmt(deliveredPercent)}%</div>
+            </div>
           </div>
         </div>
 
-        <div class="card bg-light text-center col-md-2 col-sm-6 m-2">
-          <div class="card-body">
-            <h6 class="text-uppercase">Opens</h6>
-            <h4 class="text-primary">${formatNumber(opens)}</h4>
+        <div class="col-6 col-md">
+          <div class="card text-center h-100">
+            <div class="card-body py-4">
+              <i class="fas fa-eye fa-2x text-primary mb-3"></i>
+              <div class="text-uppercase text-muted small fw-semibold mb-1">Opens</div>
+              <div class="fs-3 fw-bold text-primary">${fmt(opens)}</div>
+            </div>
           </div>
         </div>
 
-        <div class="card bg-light text-center col-md-2 col-sm-6 m-2">
-          <div class="card-body">
-            <h6 class="text-uppercase">Clicks</h6>
-            <h4 class="text-warning">${formatNumber(clicks)}</h4>
+        <div class="col-6 col-md">
+          <div class="card text-center h-100">
+            <div class="card-body py-4">
+              <i class="fas fa-mouse-pointer fa-2x mb-3" style="color: #8b5cf6;"></i>
+              <div class="text-uppercase text-muted small fw-semibold mb-1">Clicks</div>
+              <div class="fs-3 fw-bold" style="color: #8b5cf6;">${fmt(clicks)}</div>
+            </div>
           </div>
         </div>
 
-        <div class="card bg-light text-center col-md-2 col-sm-6 m-2">
-          <div class="card-body">
-            <h6 class="text-uppercase">Not Delivered</h6>
-            <h4 class="text-danger mb-0">${formatNumber(notDelivered)}</h4>
-            <div class="text-muted">${formatNumber(notDeliveredPercent)}%</div>
+        <div class="col-6 col-md">
+          <div class="card text-center h-100">
+            <div class="card-body py-4">
+              <i class="fas fa-exclamation-circle fa-2x text-danger mb-3"></i>
+              <div class="text-uppercase text-muted small fw-semibold mb-1">Not Delivered</div>
+              <div class="fs-3 fw-bold text-danger">${fmt(notDelivered)}</div>
+              <div class="text-muted small">${fmt(notDeliveredPercent)}%</div>
+            </div>
           </div>
         </div>
       </div>
@@ -171,36 +212,18 @@ class DashboardApp {
   }
 
   fillChartData(data) {
-    const datasets = [];
-    data.datasets.forEach(element => {
-      datasets.push({
-        label: element.label,
-        data: element.data,
-        backgroundColor: this.chartColors[element.label],
-        borderColor: this.chartColors[element.label],
-        fill: false
-      });
-    });
+    const datasets = data.datasets.map(element => ({
+      label:           element.label,
+      data:            element.data,
+      backgroundColor: this.chartColors[element.label],
+      borderColor:     this.chartColors[element.label],
+      fill:            false,
+      tension:         0.3,
+      pointRadius:     3,
+      pointHoverRadius: 5
+    }));
 
     const labels = data.labels.map(label => moment(label).format('L'));
-
-    const chartData = {
-      labels: labels,
-      datasets: datasets
-    };
-
-    const options = {
-      responsive: true,
-      maintainAspectRatio: false,
-      tooltips: {
-        mode: 'index',
-        intersect: false,
-      },
-      hover: {
-        mode: 'nearest',
-        intersect: true
-      }
-    };
 
     if (this.chart) {
       this.chart.destroy();
@@ -209,18 +232,28 @@ class DashboardApp {
     if (this.chartCanvas) {
       this.chart = new Chart(this.chartCanvas, {
         type: 'line',
-        data: chartData,
-        options: options
+        data: { labels, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            tooltip: {
+              mode: 'index',
+              intersect: false,
+            }
+          },
+          interaction: {
+            mode: 'nearest',
+            intersect: true
+          }
+        }
       });
     }
   }
 }
 
-// Initialize when DOM is ready
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    new DashboardApp();
-  });
+  document.addEventListener('DOMContentLoaded', () => new DashboardApp());
 } else {
   new DashboardApp();
 }

@@ -36441,8 +36441,6 @@ function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e 
 
 
 
-
-// Activity Application
 var ActivityApp = /*#__PURE__*/function () {
   function ActivityApp() {
     _classCallCheck(this, ActivityApp);
@@ -36463,7 +36461,7 @@ var ActivityApp = /*#__PURE__*/function () {
     this.detailsLoading = false;
     this.eventOptions = [{
       value: null,
-      text: 'Select an event'
+      text: 'All Events'
     }, {
       value: 'send',
       text: 'Send'
@@ -36497,11 +36495,7 @@ var ActivityApp = /*#__PURE__*/function () {
       this.createDOM();
       this.setupFilters();
       this.setupModal();
-
-      // Expose to window for external control
       window.activityVueInstance = this;
-
-      // Load initial data
       this.loadData();
     }
   }, {
@@ -36509,15 +36503,14 @@ var ActivityApp = /*#__PURE__*/function () {
     value: function createDOM() {
       var appContainer = document.getElementById('app');
       if (!appContainer) return;
-      appContainer.innerHTML = "\n      <div class=\"row mb-3\">\n        <div class=\"col\">\n          <input type=\"text\" id=\"search-input\" class=\"form-control\" placeholder=\"Search Email or Subject\" />\n        </div>\n        <div class=\"col\">\n          <div class=\"input-group\">\n            <input type=\"date\" id=\"activity-date-from\" class=\"form-control\" />\n            <span class=\"input-group-text\">to</span>\n            <input type=\"date\" id=\"activity-date-to\" class=\"form-control\" />\n          </div>\n        </div>\n        <div class=\"col\">\n          <select id=\"event-select\" class=\"form-control\">\n            ".concat(this.eventOptions.map(function (opt) {
+      appContainer.innerHTML = "\n      <!-- Row 1: search + date range + clear -->\n      <div class=\"row g-2 mb-2 align-items-end\">\n        <div class=\"col-md-5\">\n          <label class=\"form-label small fw-semibold text-muted mb-1\">Search</label>\n          <input type=\"text\" id=\"search-input\" class=\"form-control\" placeholder=\"Subject or email address\" />\n        </div>\n        <div class=\"col-md-5\">\n          <label class=\"form-label small fw-semibold text-muted mb-1\">Date Range</label>\n          <div class=\"input-group\">\n            <input type=\"date\" id=\"activity-date-from\" class=\"form-control\" />\n            <span class=\"input-group-text\">to</span>\n            <input type=\"date\" id=\"activity-date-to\" class=\"form-control\" />\n          </div>\n        </div>\n        <div class=\"col-md-2 d-flex justify-content-end\">\n          <button type=\"button\" class=\"btn btn-outline-secondary w-100\" id=\"clear-btn\" title=\"Clear filters\">\n            <i class=\"fas fa-times me-1\"></i>Clear\n          </button>\n        </div>\n      </div>\n\n      <!-- Row 2: event filter + search + export -->\n      <div class=\"row g-2 mb-3 align-items-end\">\n        <div class=\"col-md-4\">\n          <label class=\"form-label small fw-semibold text-muted mb-1\">Event Type</label>\n          <select id=\"event-select\" class=\"form-control\">\n            ".concat(this.eventOptions.map(function (opt) {
         return "<option value=\"".concat(opt.value || '', "\">").concat(opt.text, "</option>");
-      }).join(''), "\n          </select>\n        </div>\n        <div class=\"col\">\n          <button type=\"button\" class=\"btn btn-outline-primary\" id=\"search-btn\">\n            <i class=\"fas fa-search\"></i> Search\n          </button>\n          <div class=\"btn-group\">\n            <button type=\"button\" class=\"btn btn-outline-secondary dropdown-toggle\" data-bs-toggle=\"dropdown\">\n              <i class=\"fas fa-download\"></i>\n            </button>\n            <ul class=\"dropdown-menu\">\n              <li><a class=\"dropdown-item\" href=\"#\" id=\"export-excel\"><i class=\"fas fa-file-excel\"></i> Excel</a></li>\n              <li><a class=\"dropdown-item\" href=\"#\" id=\"export-csv\"><i class=\"fas fa-file-csv\"></i> CSV</a></li>\n            </ul>\n          </div>\n          <button type=\"button\" class=\"btn btn-outline-secondary\" id=\"clear-btn\">\n            <i class=\"fas fa-times\"></i>\n          </button>\n        </div>\n      </div>\n\n      <div id=\"table-container\"></div>\n      <div id=\"pagination-container\"></div>\n      \n      <!-- Email Details Modal -->\n      <div class=\"modal fade\" id=\"emailDetailsModal\" tabindex=\"-1\">\n        <div class=\"modal-dialog modal-lg\">\n          <div class=\"modal-content\">\n            <div class=\"modal-header\">\n              <h5 class=\"modal-title\">Email Details</h5>\n              <button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"modal\"></button>\n            </div>\n            <div class=\"modal-body\" id=\"modal-body\">\n              <div class=\"text-center\" id=\"modal-loading\">\n                <div class=\"spinner-border text-primary\" role=\"status\">\n                  <span class=\"visually-hidden\">Loading...</span>\n                </div>\n              </div>\n              <div id=\"modal-content\" style=\"display: none;\"></div>\n            </div>\n            <div class=\"modal-footer\">\n              <button type=\"button\" class=\"btn btn-primary\" data-bs-dismiss=\"modal\">Close</button>\n            </div>\n          </div>\n        </div>\n      </div>\n    ");
+      }).join(''), "\n          </select>\n        </div>\n        <div class=\"col-md-8 d-flex gap-2 justify-content-end align-items-end\">\n          <button type=\"button\" class=\"btn btn-outline-primary\" id=\"search-btn\">\n            <i class=\"fas fa-search me-1\"></i>Search\n          </button>\n          <div class=\"btn-group\">\n            <button type=\"button\" class=\"btn btn-outline-secondary dropdown-toggle\" data-bs-toggle=\"dropdown\">\n              <i class=\"fas fa-download me-1\"></i>Export\n            </button>\n            <ul class=\"dropdown-menu dropdown-menu-end\">\n              <li><a class=\"dropdown-item\" href=\"#\" id=\"export-excel\"><i class=\"fas fa-file-excel me-2\"></i>Excel</a></li>\n              <li><a class=\"dropdown-item\" href=\"#\" id=\"export-csv\"><i class=\"fas fa-file-csv me-2\"></i>CSV</a></li>\n            </ul>\n          </div>\n        </div>\n      </div>\n\n      <div id=\"table-container\"></div>\n      <div id=\"pagination-container\"></div>\n\n      <!-- Email Details Modal -->\n      <div class=\"modal fade\" id=\"emailDetailsModal\" tabindex=\"-1\">\n        <div class=\"modal-dialog modal-lg\">\n          <div class=\"modal-content\">\n            <div class=\"modal-header\">\n              <h5 class=\"modal-title\"><i class=\"fas fa-envelope-open-text me-2 text-primary\"></i>Email Details</h5>\n              <button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"modal\"></button>\n            </div>\n            <div class=\"modal-body\" id=\"modal-body\">\n              <div class=\"text-center\" id=\"modal-loading\">\n                <div class=\"spinner-border text-primary\" role=\"status\">\n                  <span class=\"visually-hidden\">Loading...</span>\n                </div>\n              </div>\n              <div id=\"modal-content\" style=\"display: none;\"></div>\n            </div>\n            <div class=\"modal-footer\">\n              <button type=\"button\" class=\"btn btn-primary\" data-bs-dismiss=\"modal\">Close</button>\n            </div>\n          </div>\n        </div>\n      </div>\n    ");
     }
   }, {
     key: "setupFilters",
     value: function setupFilters() {
       var _this = this;
-      // Initialize dropdowns after DOM is created
       setTimeout(function () {
         return _this.initDropdowns();
       }, 100);
@@ -36529,8 +36522,6 @@ var ActivityApp = /*#__PURE__*/function () {
       var clearBtn = document.getElementById('clear-btn');
       var exportExcel = document.getElementById('export-excel');
       var exportCsv = document.getElementById('export-csv');
-
-      // Set default dates
       var defaultStart = moment__WEBPACK_IMPORTED_MODULE_0___default()().locale(window.navigator.language).startOf('week').utc().toDate();
       var defaultEnd = moment__WEBPACK_IMPORTED_MODULE_0___default()().locale(window.navigator.language).endOf('week').utc().toDate();
       if (dateFromInput) {
@@ -36545,20 +36536,32 @@ var ActivityApp = /*#__PURE__*/function () {
         searchInput.addEventListener('input', function (e) {
           _this.search = e.target.value;
         });
+        searchInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') {
+            _this.currentPage = 1;
+            _this.loadData();
+          }
+        });
       }
       if (dateFromInput) {
         dateFromInput.addEventListener('change', function (e) {
           _this.dateFrom = moment__WEBPACK_IMPORTED_MODULE_0___default()(e.target.value).startOf('day').toDate();
+          _this.currentPage = 1;
+          _this.loadData();
         });
       }
       if (dateToInput) {
         dateToInput.addEventListener('change', function (e) {
           _this.dateTo = moment__WEBPACK_IMPORTED_MODULE_0___default()(e.target.value).endOf('day').toDate();
+          _this.currentPage = 1;
+          _this.loadData();
         });
       }
       if (eventSelect) {
         eventSelect.addEventListener('change', function (e) {
           _this.eventSelected = e.target.value || null;
+          _this.currentPage = 1;
+          _this.loadData();
         });
       }
       if (searchBtn) {
@@ -36615,12 +36618,8 @@ var ActivityApp = /*#__PURE__*/function () {
         project_id: this.currentProjectId || 'all',
         format: format
       };
-      if (this.search.length) {
-        params['search'] = this.search;
-      }
-      if (this.eventSelected) {
-        params['eventType'] = this.eventSelected;
-      }
+      if (this.search.length) params['search'] = this.search;
+      if (this.eventSelected) params['eventType'] = this.eventSelected;
       return window.APP_EXPORT_URL + '?' + new URLSearchParams(params).toString();
     }
   }, {
@@ -36652,56 +36651,57 @@ var ActivityApp = /*#__PURE__*/function () {
       });
     }
   }, {
+    key: "getStatusBadge",
+    value: function getStatusBadge(status) {
+      var map = {
+        delivered: 'bg-success',
+        bounced: 'bg-danger',
+        complained: 'bg-danger',
+        sent: 'bg-secondary',
+        rejected: 'bg-warning',
+        failed: 'bg-warning'
+      };
+      var cls = map[status] || 'bg-secondary';
+      var textCls = status === 'rejected' || status === 'failed' ? ' text-dark' : '';
+      var label = status.charAt(0).toUpperCase() + status.slice(1);
+      return "<span class=\"badge ".concat(cls).concat(textCls, "\">").concat(label, "</span>");
+    }
+  }, {
     key: "renderTable",
     value: function renderTable() {
       var _this4 = this;
       var container = document.getElementById('table-container');
       if (!container) return;
       if (this.isBusy) {
-        container.innerHTML = "\n        <div class=\"text-center text-primary my-2\">\n          <div class=\"spinner-border\" role=\"status\">\n            <span class=\"visually-hidden\">Loading...</span>\n          </div>\n        </div>\n      ";
+        container.innerHTML = "\n        <div class=\"text-center text-primary my-4\">\n          <div class=\"spinner-border\" role=\"status\">\n            <span class=\"visually-hidden\">Loading...</span>\n          </div>\n        </div>\n      ";
         return;
       }
       if (this.rows.length === 0) {
-        container.innerHTML = '<div class="text-center lead">No emails to display</div>';
+        container.innerHTML = "\n        <div class=\"text-center py-5 text-muted\">\n          <i class=\"fas fa-inbox fa-3x mb-3 d-block\"></i>\n          <div class=\"lead\">No emails to display</div>\n          <small>Try adjusting your filters or date range.</small>\n        </div>\n      ";
         return;
       }
-      var getStatusClass = function getStatusClass(status) {
-        var classes = {
-          'delivered': 'text-success',
-          'bounced': 'text-danger',
-          'complained': 'text-danger',
-          'sent': 'text-muted'
-        };
-        return classes[status] || 'text-muted';
-      };
       var formatDate = function formatDate(value) {
         if (!value) return '';
         return moment__WEBPACK_IMPORTED_MODULE_0___default()(value).locale(window.navigator.language).local().format('LLL');
       };
-      var tableHTML = "\n      <table class=\"table table-hover\">\n        <thead>\n          <tr>\n            <th>Status</th>\n            <th>Message</th>\n            <th>Sent at</th>\n            <th>Opens</th>\n            <th>Clicks</th>\n          </tr>\n        </thead>\n        <tbody>\n    ";
+      var tableHTML = "\n      <table class=\"table table-hover\">\n        <thead>\n          <tr>\n            <th style=\"width: 130px;\">Status</th>\n            <th>Message</th>\n            <th style=\"width: 190px;\">Sent At</th>\n            <th style=\"width: 70px;\">Opens</th>\n            <th style=\"width: 70px;\">Clicks</th>\n          </tr>\n        </thead>\n        <tbody>\n    ";
       this.rows.forEach(function (row) {
-        var statusClass = getStatusClass(row.status);
-        tableHTML += "\n        <tr style=\"cursor: pointer;\" data-id=\"".concat(row.id, "\">\n          <td>\n            <i class=\"fas fa-dot-circle ").concat(statusClass, "\"></i>\n            <span class=\"text-capitalize\">").concat(row.status, "</span>\n          </td>\n          <td>\n            <p><b>").concat(row.subject || '', "</b></p>\n            <p><b>To:</b> ").concat((row.destination || []).join(', '), "</p>\n          </td>\n          <td>\n            <span title=\"").concat(row.timestamp, "\">").concat(formatDate(row.timestamp), "</span>\n          </td>\n          <td>").concat(row.opens || 0, "</td>\n          <td>").concat(row.clicks || 0, "</td>\n        </tr>\n      ");
+        tableHTML += "\n        <tr style=\"cursor: pointer;\" data-id=\"".concat(row.id, "\">\n          <td>").concat(_this4.getStatusBadge(row.status), "</td>\n          <td>\n            <div class=\"fw-semibold\">").concat(row.subject || '<em class="text-muted">(no subject)</em>', "</div>\n            <small class=\"text-muted\">").concat((row.destination || []).join(', '), "</small>\n          </td>\n          <td>\n            <span title=\"").concat(row.timestamp, " UTC\">").concat(formatDate(row.timestamp), "</span>\n          </td>\n          <td>").concat(row.opens || 0, "</td>\n          <td>").concat(row.clicks || 0, "</td>\n        </tr>\n      ");
       });
-      tableHTML += "\n        </tbody>\n      </table>\n    ";
+      tableHTML += "</tbody></table>";
       container.innerHTML = tableHTML;
-
-      // Add click handlers
       container.querySelectorAll('tbody tr').forEach(function (tr) {
         tr.addEventListener('click', function () {
           var id = tr.getAttribute('data-id');
-          if (id) {
-            _this4.rowClicked(id);
-          }
+          if (id) _this4.rowClicked(id);
         });
       });
     }
   }, {
     key: "initDropdowns",
     value: function initDropdowns() {
-      // Initialize Bootstrap dropdowns
       document.querySelectorAll('.dropdown-toggle').forEach(function (element) {
-        new bootstrap__WEBPACK_IMPORTED_MODULE_1__.Dropdown(element);
+        return new bootstrap__WEBPACK_IMPORTED_MODULE_1__.Dropdown(element);
       });
     }
   }, {
@@ -36709,31 +36709,27 @@ var ActivityApp = /*#__PURE__*/function () {
     value: function renderPagination() {
       var _this5 = this;
       var container = document.getElementById('pagination-container');
-      if (!container || this.totalRows <= this.perPage) {
-        if (container) container.innerHTML = '';
+      if (!container) return;
+      var start = (this.currentPage - 1) * this.perPage + 1;
+      var end = Math.min(this.currentPage * this.perPage, this.totalRows);
+      var countHTML = this.totalRows > 0 ? "<div class=\"text-muted small mb-2\">Showing ".concat(start, "\u2013").concat(end, " of ").concat(this.totalRows.toLocaleString(), " results</div>") : '';
+      if (this.totalRows <= this.perPage) {
+        container.innerHTML = countHTML;
         return;
       }
       var totalPages = Math.ceil(this.totalRows / this.perPage);
-      var paginationHTML = '<nav><ul class="pagination">';
-
-      // Previous button
+      var paginationHTML = '<nav><ul class="pagination mb-0">';
       paginationHTML += "\n      <li class=\"page-item ".concat(this.currentPage === 1 ? 'disabled' : '', "\">\n        <a class=\"page-link\" href=\"#\" data-page=\"").concat(this.currentPage - 1, "\">Previous</a>\n      </li>\n    ");
-
-      // Page numbers
       for (var i = 1; i <= totalPages; i++) {
         if (i === 1 || i === totalPages || i >= this.currentPage - 2 && i <= this.currentPage + 2) {
           paginationHTML += "\n          <li class=\"page-item ".concat(this.currentPage === i ? 'active' : '', "\">\n            <a class=\"page-link\" href=\"#\" data-page=\"").concat(i, "\">").concat(i, "</a>\n          </li>\n        ");
         } else if (i === this.currentPage - 3 || i === this.currentPage + 3) {
-          paginationHTML += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+          paginationHTML += '<li class="page-item disabled"><span class="page-link">…</span></li>';
         }
       }
-
-      // Next button
       paginationHTML += "\n      <li class=\"page-item ".concat(this.currentPage === totalPages ? 'disabled' : '', "\">\n        <a class=\"page-link\" href=\"#\" data-page=\"").concat(this.currentPage + 1, "\">Next</a>\n      </li>\n    ");
       paginationHTML += '</ul></nav>';
-      container.innerHTML = paginationHTML;
-
-      // Add click handlers
+      container.innerHTML = countHTML + paginationHTML;
       container.querySelectorAll('a.page-link').forEach(function (link) {
         link.addEventListener('click', function (e) {
           e.preventDefault();
@@ -36751,9 +36747,7 @@ var ActivityApp = /*#__PURE__*/function () {
       this.selectedId = id;
       this.showDetails = true;
       this.loadDetails();
-      if (this.detailsModal) {
-        this.detailsModal.show();
-      }
+      if (this.detailsModal) this.detailsModal.show();
     }
   }, {
     key: "loadDetails",
@@ -36791,10 +36785,10 @@ var ActivityApp = /*#__PURE__*/function () {
         if (!value) return '';
         return moment__WEBPACK_IMPORTED_MODULE_0___default()(value).locale(window.navigator.language).local().format('LLL');
       };
-      var detailsHTML = "\n      <div class=\"table-responsive\">\n        <table class=\"table\">\n          <tbody>\n            <tr>\n              <th>Subject</th>\n              <td>".concat(this.emailDetails.subject || '', "</td>\n            </tr>\n            <tr>\n              <th>MessageId</th>\n              <td>").concat(this.emailDetails.messageId || '', "</td>\n            </tr>\n            <tr>\n              <th>Destination</th>\n              <td>").concat((this.emailDetails.destination || []).join(', '), "</td>\n            </tr>\n            <tr>\n              <th>Source</th>\n              <td>").concat(this.emailDetails.source || '', "</td>\n            </tr>\n            <tr>\n              <th>DateTime</th>\n              <td>").concat(formatDate(this.emailDetails.timestamp), " (").concat(this.emailDetails.timestamp, " UTC)</td>\n            </tr>\n          </tbody>\n        </table>\n      </div>\n\n      <h5>Events Log</h5>\n      <ul class=\"list-group\">\n    ");
+      var detailsHTML = "\n      <div class=\"table-responsive mb-4\">\n        <table class=\"table\">\n          <tbody>\n            <tr>\n              <th style=\"width: 130px;\">Subject</th>\n              <td>".concat(this.emailDetails.subject || '', "</td>\n            </tr>\n            <tr>\n              <th>Message ID</th>\n              <td><code class=\"user-select-all\">").concat(this.emailDetails.messageId || '', "</code></td>\n            </tr>\n            <tr>\n              <th>Destination</th>\n              <td>").concat((this.emailDetails.destination || []).join(', '), "</td>\n            </tr>\n            <tr>\n              <th>Source</th>\n              <td>").concat(this.emailDetails.source || '', "</td>\n            </tr>\n            <tr>\n              <th>Sent</th>\n              <td title=\"").concat(this.emailDetails.timestamp, " UTC\">").concat(formatDate(this.emailDetails.timestamp), "</td>\n            </tr>\n          </tbody>\n        </table>\n      </div>\n\n      <h5 class=\"mb-3\"><i class=\"fas fa-stream me-2 text-primary\"></i>Events Log</h5>\n      <ul class=\"list-group list-group-flush\">\n    ");
       (this.emailDetails.emailEvents || []).forEach(function (emailEvent, index) {
         var collapseId = "collapse-".concat(emailEvent.id || index);
-        detailsHTML += "\n        <li class=\"list-group-item\">\n          <div>\n            <button class=\"btn btn-link p-0\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#".concat(collapseId, "\">\n              <i class=\"fas fa-file-alt float-end small text-muted\"></i>\n              <i class=\"far fa-dot-circle text-primary\"></i>\n              <span class=\"text-capitalize lead\">").concat(emailEvent.event, "</span>\n              <small>").concat(formatDate(emailEvent.timestamp), " (").concat(emailEvent.timestamp, " UTC)</small>\n            </button>\n          </div>\n          <div class=\"collapse bg-light p-4\" id=\"").concat(collapseId, "\">\n            <pre><code>").concat(emailEvent.eventData || '', "</code></pre>\n          </div>\n        </li>\n      ");
+        detailsHTML += "\n        <li class=\"list-group-item px-0\">\n          <div class=\"d-flex align-items-center justify-content-between\">\n            <button class=\"btn btn-link p-0 text-start text-decoration-none\" type=\"button\" data-bs-toggle=\"collapse\" data-bs-target=\"#".concat(collapseId, "\">\n              <i class=\"far fa-dot-circle text-primary me-2\"></i>\n              <span class=\"fw-semibold text-capitalize\">").concat(emailEvent.event, "</span>\n              <small class=\"text-muted ms-2\" title=\"").concat(emailEvent.timestamp, " UTC\">").concat(formatDate(emailEvent.timestamp), "</small>\n            </button>\n            <i class=\"fas fa-chevron-down text-muted small\"></i>\n          </div>\n          <div class=\"collapse mt-2\" id=\"").concat(collapseId, "\">\n            <pre class=\"bg-light rounded p-3 small mb-0\"><code>").concat(emailEvent.eventData || '', "</code></pre>\n          </div>\n        </li>\n      ");
       });
       detailsHTML += '</ul>';
       modalContent.innerHTML = detailsHTML;
@@ -36807,10 +36801,10 @@ var ActivityApp = /*#__PURE__*/function () {
       this.loadData();
     }
   }]);
-}(); // Initialize when DOM is ready
+}();
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function () {
-    new ActivityApp();
+    return new ActivityApp();
   });
 } else {
   new ActivityApp();
