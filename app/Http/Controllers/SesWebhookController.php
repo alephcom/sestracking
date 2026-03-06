@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Models\{Project, Email, EmailRecipient, RecipientEvent};
 
@@ -106,7 +107,7 @@ class SesWebhookController extends Controller
             ['project_id' => $project->id, 'message_id' => $ses['mail']['messageId']],
             [
                 'source'   => $ses['mail']['source'],
-                'subject'  => $ses['mail']['commonHeaders']['subject'] ?? '',
+                'subject'  => Str::limit($ses['mail']['commonHeaders']['subject'] ?? '', 65535, ''),
                 'sent_at'  => Carbon::parse($ses['mail']['timestamp']),
             ]
         );
