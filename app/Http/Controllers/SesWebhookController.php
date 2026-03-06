@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Models\{Project, Email, EmailRecipient, RecipientEvent};
+use function Sentry\withScope;
+use function Sentry\captureMessage;
 
 class SesWebhookController extends Controller
 {
@@ -39,6 +41,13 @@ class SesWebhookController extends Controller
         
         $sns = json_decode($request->getContent(), true);
         if (! $sns) {
+            if (config('sentry.dsn')) {
+                withScope(function (\Sentry\State\Scope $scope) use ($request, $token): void {
+                    $scope->setTag('webhook.token', $token);
+                    $scope->setContext('webhook', ['content_length' => strlen($request->getContent())]);
+                    captureMessage('Invalid SES webhook: malformed JSON body', \Sentry\Severity::warning());
+                });
+            }
             return response('Bad JSON', 400);
         }
 
@@ -67,12 +76,29 @@ class SesWebhookController extends Controller
             $message = $sns['Message'] ?? null;
             if (!$message) {
                 Log::warning('SNS notification missing Message field', ['message_id' => $messageId, 'sns_type' => $sns['Type'] ?? 'unknown']);
+                if (config('sentry.dsn')) {
+                    withScope(function (\Sentry\State\Scope $scope) use ($messageId, $sns, $token): void {
+                        $scope->setTag('webhook.token', $token);
+                        $scope->setContext('webhook', [
+                            'message_id' => $messageId,
+                            'sns_type'   => $sns['Type'] ?? 'unknown',
+                        ]);
+                        captureMessage('Invalid SES webhook: SNS Message field missing', \Sentry\Severity::warning());
+                    });
+                }
                 return response('Missing Message', 400);
             }
 
             $ses = json_decode($message, true);
             if (!$ses) {
                 Log::warning('SNS Message field contains invalid JSON', ['message_id' => $messageId, 'message' => $message]);
+                if (config('sentry.dsn')) {
+                    withScope(function (\Sentry\State\Scope $scope) use ($messageId, $token): void {
+                        $scope->setTag('webhook.token', $token);
+                        $scope->setContext('webhook', ['message_id' => $messageId]);
+                        captureMessage('Invalid SES webhook: SNS Message field is not valid JSON', \Sentry\Severity::warning());
+                    });
+                }
                 return response('Invalid Message JSON', 400);
             }
         } 
@@ -100,6 +126,13 @@ class SesWebhookController extends Controller
         } else {
             // Unknown format
             Log::warning('Unknown webhook payload format', ['payload_keys' => array_keys($sns), 'payload' => $sns]);
+            if (config('sentry.dsn')) {
+                withScope(function (\Sentry\State\Scope $scope) use ($sns, $token): void {
+                    $scope->setTag('webhook.token', $token);
+                    $scope->setContext('webhook', ['payload_keys' => array_keys($sns)]);
+                    captureMessage('Invalid SES webhook: unknown payload format', \Sentry\Severity::warning());
+                });
+            }
             return response('Unknown payload format', 400);
         }
 

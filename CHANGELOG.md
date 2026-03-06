@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sentry error tracking support via `sentry/sentry-laravel`; set `SENTRY_LARAVEL_DSN` in `.env` to enable (optional)
 - SES webhook now accepts direct payloads that use `notificationType` (e.g. Delivery) in addition to `eventType`; previously these were logged as "Unknown webhook payload format"
 - Email subjects longer than 255 characters (e.g. containing long URLs) no longer cause a database error; `subject` column changed from `VARCHAR(255)` to `TEXT`
+- Invalid webhook requests (malformed JSON, missing/invalid SNS Message field, unknown payload format) now trigger Sentry warning events with contextual data when `SENTRY_LARAVEL_DSN` is configured
 
 ## [0.4.0] - 2025-12-14
 
