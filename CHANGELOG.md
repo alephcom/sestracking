@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SES webhook now accepts direct payloads that use `notificationType` (e.g. Delivery) in addition to `eventType`; previously these were logged as "Unknown webhook payload format"
 - Email subjects longer than 255 characters (e.g. containing long URLs) no longer cause a database error; `subject` column changed from `VARCHAR(255)` to `TEXT`
 - Invalid webhook requests (malformed JSON, missing/invalid SNS Message field, unknown payload format) now trigger Sentry warning events with contextual data when `SENTRY_LARAVEL_DSN` is configured
+- New `SOCIALITE_AUTO_CREATE_USERS` env flag (default `false`) controls whether SSO can auto-register users with no existing account; when disabled, only pre-existing or invited users may sign in via SSO
 
 ## [0.4.0] - 2025-12-14
 

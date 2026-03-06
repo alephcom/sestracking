@@ -112,4 +112,18 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | SSO Auto-Registration
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, users who authenticate via SSO (Google, Microsoft) but do
+    | not yet have an account will have one created automatically. When disabled
+    | (the default), only users who already exist in the system — either via an
+    | invitation or manual creation — can log in with SSO.
+    |
+    */
+
+    'socialite_auto_create_users' => env('SOCIALITE_AUTO_CREATE_USERS', false),
+
 ];

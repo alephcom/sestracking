@@ -48,8 +48,14 @@ class SocialAuthController extends Controller
             }
         }
 
-        // Create a new account for first-time SSO users
+        // Create a new account for first-time SSO users (only when auto-registration is enabled)
         if (! $user) {
+            if (! config('auth.socialite_auto_create_users', false)) {
+                return redirect()->route('login')->withErrors([
+                    'email' => 'No account exists for this email address. Please contact an administrator.',
+                ]);
+            }
+
             $user = User::create([
                 'name'        => $socialUser->getName() ?? $socialUser->getEmail(),
                 'email'       => $socialUser->getEmail(),
