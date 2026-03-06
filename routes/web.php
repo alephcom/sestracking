@@ -38,7 +38,7 @@ Route::group([
 ], function () {
 
 Route::get('logout',[AuthController::class,'logout'])->name('logout');
-Route::get('/',[DashboardController::class,'index'])->name('dashboard.index');
+Route::get('/dashboard',[DashboardController::class,'index'])->name('dashboard.index');
 Route::get('dashboard/api',[DashboardController::class,'jsApi'])->name('dashboard.api');
 Route::get('activity',[ActivityController::class,'index'])->name('activity');
 Route::get('activity/list/api',[ActivityController::class,'listApi']);

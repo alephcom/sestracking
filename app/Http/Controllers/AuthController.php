@@ -14,7 +14,7 @@ class AuthController extends Controller
        $error = null;
         if (Auth::attempt($credentials)) {
             $request->session()->regenerate();
-            return redirect()->intended('/');
+            return redirect()->intended(route('dashboard.index'));
         }else if($request->has('submit')){
             $error = "Invalid email or password.";
         }

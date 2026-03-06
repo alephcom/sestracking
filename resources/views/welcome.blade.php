@@ -80,7 +80,7 @@
             </a>
             <div class="ms-auto">
                 @auth
-                    <a href="{{ url('/') }}" class="btn btn-primary btn-sm px-4">
+                    <a href="{{ route('dashboard.index') }}" class="btn btn-primary btn-sm px-4">
                         <i class="fa-solid fa-gauge me-1"></i> Dashboard
                     </a>
                 @else
@@ -105,7 +105,7 @@
             </p>
             <div class="d-flex gap-3 justify-content-center flex-wrap">
                 @auth
-                    <a href="{{ url('/') }}" class="btn btn-primary btn-lg px-5">
+                    <a href="{{ route('dashboard.index') }}" class="btn btn-primary btn-lg px-5">
                         <i class="fa-solid fa-gauge me-2"></i>Go to Dashboard
                     </a>
                 @else

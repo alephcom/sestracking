@@ -24,6 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Invalid webhook requests (malformed JSON, missing/invalid SNS Message field, unknown payload format) now trigger Sentry warning events with contextual data when `SENTRY_LARAVEL_DSN` is configured
 - New `SOCIALITE_AUTO_CREATE_USERS` env flag (default `false`) controls whether SSO can auto-register users with no existing account; when disabled, only pre-existing or invited users may sign in via SSO
 
+### Fixed
+- Root URL `/` now shows the public welcome page; dashboard moved to `/dashboard` so unauthenticated visitors are no longer immediately redirected to login
+
 ## [0.4.0] - 2025-12-14
 
 ### Added
