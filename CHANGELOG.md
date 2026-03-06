@@ -8,9 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Sentry error tracking support via `sentry/sentry-laravel`; set `SENTRY_LARAVEL_DSN` in `.env` to enable (optional)
+- Google and Microsoft SSO via `laravel/socialite` and `socialiteproviders/microsoft`; set `GOOGLE_CLIENT_ID` / `MICROSOFT_CLIENT_ID` env keys to enable each provider independently
+- SSO buttons on the login page are conditionally rendered — only providers with credentials configured in `.env` are shown
+- New `provider`, `provider_id`, and `avatar` columns on `users` table to support OAuth accounts
+- Existing email/password accounts are automatically linked on first SSO login by matching email address
+- New `SocialAuthController` handles OAuth redirect and callback for both providers
+- Modernised login page: centred card layout with branded logo, Bootstrap 5 input groups, full-width sign-in button, and SSO divider
+- Updated `signin.scss` with dark-blue gradient background aligned to app primary colour, wider card (440px), and brand-styled SSO buttons
 
 ### Fixed
+- Sentry error tracking support via `sentry/sentry-laravel`; set `SENTRY_LARAVEL_DSN` in `.env` to enable (optional)
 - SES webhook now accepts direct payloads that use `notificationType` (e.g. Delivery) in addition to `eventType`; previously these were logged as "Unknown webhook payload format"
 
 ## [0.4.0] - 2025-12-14

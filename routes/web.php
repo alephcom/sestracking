@@ -4,6 +4,7 @@ use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SendTestController;
+use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WebHookController;
 use Illuminate\Support\Facades\Route;
@@ -21,6 +22,14 @@ Route::post('webhook/{token}', App\Http\Controllers\SesWebhookController::class)
 // Invitation routes (public)
 Route::get('invitation/accept/{token}', [App\Http\Controllers\InvitationController::class, 'show'])->name('invitation.show');
 Route::post('invitation/accept', [App\Http\Controllers\InvitationController::class, 'accept'])->name('invitation.accept');
+
+// SSO routes (public)
+Route::get('auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])
+    ->where('provider', 'google|microsoft')
+    ->name('social.redirect');
+Route::get('auth/{provider}/callback', [SocialAuthController::class, 'callback'])
+    ->where('provider', 'google|microsoft')
+    ->name('social.callback');
 
 
 
