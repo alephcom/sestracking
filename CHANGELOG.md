@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Suppress Sass deprecation warnings (`color-functions`, `global-builtin`, `import`) emitted by Bootstrap 5's SCSS when built with Sass 1.77+; configured `quietDeps` and `silenceDeprecations` in `webpack.mix.js`
+
 ### Added
 - Mobile offcanvas navigation: hamburger button in the navbar on small screens opens a full Bootstrap 5 offcanvas panel with all nav sections (Dashboard, Activity, Reports, Settings, Admin)
 - Dashboard project selector replaced with a checkbox dropdown — individual projects can be toggled without Ctrl+click; "All Projects" auto-deselects when specific projects are chosen and vice versa
