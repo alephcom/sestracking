@@ -75,15 +75,15 @@ class SesWebhookController extends Controller
                 return response('Invalid Message JSON', 400);
             }
         } 
-        // Check if this is a direct SES notification (has eventType and mail)
-        elseif (isset($sns['eventType']) && isset($sns['mail'])) {
+        // Check if this is a direct SES notification (has eventType or notificationType, and mail)
+        elseif (isset($sns['mail']) && (isset($sns['eventType']) || isset($sns['notificationType']))) {
             // Direct SES format: treat the payload as the SES notification directly
             $ses = $sns;
             
             // Generate a unique MessageId from the SES mail messageId and timestamp for deduplication
             $sesMessageId = $ses['mail']['messageId'] ?? null;
             $timestamp = $ses['mail']['timestamp'] ?? now()->toIso8601String();
-            $eventType = $ses['eventType'] ?? 'unknown';
+            $eventType = $ses['eventType'] ?? $ses['notificationType'] ?? 'unknown';
             $payloadKey = lcfirst($eventType); // SES uses camelCase keys (e.g. deliveryDelay, renderingFailure)
             
             if ($sesMessageId) {

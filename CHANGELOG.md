@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Sentry error tracking support via `sentry/sentry-laravel`; set `SENTRY_LARAVEL_DSN` in `.env` to enable (optional)
 
+### Fixed
+- SES webhook now accepts direct payloads that use `notificationType` (e.g. Delivery) in addition to `eventType`; previously these were logged as "Unknown webhook payload format"
+
 ## [0.4.0] - 2025-12-14
 
 ### Added
