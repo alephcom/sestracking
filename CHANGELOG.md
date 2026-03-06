@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+- Added database indexes on `recipient_events.event_at`, `recipient_events.recipient_id`, `emails.sent_at`, and `emails.source` — eliminates full-table scans on the largest tables, the single biggest factor in slow dashboard loads at scale
+- Added MySQL `FULLTEXT` indexes on `emails.subject` and `email_recipients.address` for future full-text search support
+- Dashboard counter query rewritten from `whereHas` (nested `EXISTS` subqueries traversing two relationship levels) to a direct 3-table JOIN with `GROUP BY` — executed as a single efficient query
+- Dashboard chart query now pushes `DATE(DATE_ADD(event_at, INTERVAL N MINUTE))` grouping into SQL on MySQL, so the database returns one row per day/event-type instead of every individual event row; SQLite falls back to the original PHP-grouping path
+- Dashboard API responses cached for 5 minutes per project/date/timezone combination via Laravel's cache layer
+- `emailsReport`: replaced `withCount` correlated subqueries + eager-loaded recipients with a single JOIN query that computes opens, clicks, recipient count, and email status in SQL
+- `recipientsReport`: replaced `whereHas` (EXISTS subquery) with a direct JOIN; fixed non-portable double-quoted string literals that could silently misfire in strict MySQL mode
+- `sendersReport`: replaced full PHP aggregation loop (loading all emails and recipients into memory) with a two-level SQL aggregation — inner subquery produces one row per email with computed status, outer query groups by sender
+- `bouncedRecipientsReport`: replaced `whereHas` + deep `with(['recipient.email.project'])` eager-load with a direct 4-table JOIN selecting only the columns needed for the response
+- Activity `eventType` filter rewritten from `whereHas` (nested EXISTS through `hasManyThrough`) to a `whereIn` subquery joining `email_recipients → recipient_events` directly
+
 ### Fixed
 - Suppress Sass deprecation warnings (`color-functions`, `global-builtin`, `import`) emitted by Bootstrap 5's SCSS when built with Sass 1.77+; configured `quietDeps` and `silenceDeprecations` in `webpack.mix.js`
 

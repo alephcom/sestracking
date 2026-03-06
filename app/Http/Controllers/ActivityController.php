@@ -81,10 +81,15 @@ class ActivityController extends Controller
         }
 
         if (!empty($filters['eventType'])) {
-            $email->whereHas('events', function($query) use ($filters) {
-                $query->where('type', $filters['eventType']);
+            // whereIn subquery is more efficient than whereHas (avoids nested EXISTS
+            // traversing the hasManyThrough relationship chain)
+            $email->whereIn('emails.id', function ($query) use ($filters) {
+                $query->select('er.email_id')
+                    ->from('email_recipients as er')
+                    ->join('recipient_events as re', 'er.id', '=', 're.recipient_id')
+                    ->where('re.type', $filters['eventType']);
             });
-        }   
+        }
 
         $results = $email->orderBy('sent_at','desc')->paginate(10);
 

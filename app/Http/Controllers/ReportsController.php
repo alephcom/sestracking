@@ -15,7 +15,6 @@ class ReportsController extends Controller
     {
         $accessibleProjects = $projectService->getAccessibleProjects(auth()->user());
         
-        // Default date range: last 30 days
         $defaultStartDate = Carbon::now()->subDays(30)->format('Y-m-d');
         $defaultEndDate = Carbon::now()->format('Y-m-d');
         
@@ -23,372 +22,292 @@ class ReportsController extends Controller
     }
 
     /**
-     * Report 1: List all emails with status, opens, and clicks
+     * Resolve and validate project IDs from a request against accessible IDs.
+     * Returns null when the resolved set is empty (caller should return 403).
+     */
+    private function resolveProjectIds(Request $request, array $accessibleProjectIds): ?array
+    {
+        $projectId = $request->get('projectId', 'all');
+
+        if ($projectId === 'all' || empty($projectId)) {
+            return $accessibleProjectIds;
+        }
+
+        $requestedIds = strpos($projectId, ',') !== false
+            ? array_map('trim', explode(',', $projectId))
+            : [$projectId];
+
+        $selected = array_intersect(array_map('intval', $requestedIds), $accessibleProjectIds);
+
+        return empty($selected) ? null : array_values($selected);
+    }
+
+    /**
+     * Report 1: List all emails with status, opens, and clicks.
+     *
+     * Uses a single JOIN query to compute status and aggregates in SQL,
+     * avoiding loading all recipients and events as Eloquent collections.
      */
     public function emailsReport(Request $request, ProjectAccessService $projectService)
     {
         $user = auth()->user();
         $accessibleProjectIds = $projectService->getAccessibleProjectIds($user);
-        
-        // Validate and get filters
+
         $request->validate([
             'projectId' => 'nullable|string',
-            'dateFrom' => 'required|date',
-            'dateTo' => 'required|date|after_or_equal:dateFrom',
+            'dateFrom'  => 'required|date',
+            'dateTo'    => 'required|date|after_or_equal:dateFrom',
         ]);
 
-        $projectId = $request->get('projectId', 'all');
-        $dateFrom = Carbon::parse($request->get('dateFrom'))->startOfDay();
-        $dateTo = Carbon::parse($request->get('dateTo'))->endOfDay();
-
-        // Determine which projects to include
-        if ($projectId === 'all' || empty($projectId)) {
-            $selectedProjectIds = $accessibleProjectIds;
-        } else {
-            // Handle comma-separated project IDs
-            if (strpos($projectId, ',') !== false) {
-                $requestedIds = array_map('trim', explode(',', $projectId));
-            } else {
-                $requestedIds = [$projectId];
-            }
-            
-            // Filter to only include accessible project IDs
-            $selectedProjectIds = array_intersect(
-                array_map('intval', $requestedIds),
-                $accessibleProjectIds
-            );
-        }
-
-        if (empty($selectedProjectIds)) {
+        $selectedProjectIds = $this->resolveProjectIds($request, $accessibleProjectIds);
+        if ($selectedProjectIds === null) {
             return response()->json(['error' => 'No accessible projects selected'], 403);
         }
 
-        // Query emails with aggregated open and click counts
-        $emails = Email::whereIn('project_id', $selectedProjectIds)
-            ->whereBetween('sent_at', [$dateFrom, $dateTo])
-            ->with(['project', 'recipients'])
-            ->withCount([
-                'events as opens_count' => function ($query) {
-                    $query->where('type', 'open');
-                },
-                'events as clicks_count' => function ($query) {
-                    $query->where('type', 'click');
-                }
-            ])
-            ->withCount('recipients as recipient_count')
-            ->orderBy('sent_at', 'desc')
+        $dateFrom = Carbon::parse($request->get('dateFrom'))->startOfDay();
+        $dateTo   = Carbon::parse($request->get('dateTo'))->endOfDay();
+
+        $emails = DB::table('emails as e')
+            ->join('projects as p', 'e.project_id', '=', 'p.id')
+            ->leftJoin('email_recipients as er', 'e.id', '=', 'er.email_id')
+            ->leftJoin('recipient_events as re', 'er.id', '=', 're.recipient_id')
+            ->select('e.id', 'e.subject', 'e.source', 'e.sent_at', 'p.name as project_name')
+            ->selectRaw('COUNT(DISTINCT er.id) as recipient_count')
+            ->selectRaw("SUM(CASE WHEN re.type = 'open' THEN 1 ELSE 0 END) as opens_count")
+            ->selectRaw("SUM(CASE WHEN re.type = 'click' THEN 1 ELSE 0 END) as clicks_count")
+            ->selectRaw("CASE
+                WHEN MAX(CASE WHEN er.status IN ('bounced', 'rejected') THEN 1 ELSE 0 END) = 1 THEN 'bounced'
+                WHEN MAX(CASE WHEN er.status = 'complained' THEN 1 ELSE 0 END) = 1 THEN 'complained'
+                WHEN MAX(CASE WHEN er.status = 'delivered' THEN 1 ELSE 0 END) = 1 THEN 'delivered'
+                ELSE 'sent'
+            END as status")
+            ->whereIn('e.project_id', $selectedProjectIds)
+            ->whereBetween('e.sent_at', [$dateFrom, $dateTo])
+            ->groupBy('e.id', 'e.subject', 'e.source', 'e.sent_at', 'p.name')
+            ->orderBy('e.sent_at', 'desc')
             ->get()
             ->map(function ($email) {
                 return [
-                    'id' => $email->id,
-                    'project_name' => $email->project->name,
-                    'subject' => $email->subject ?? '(No subject)',
-                    'source' => $email->source,
-                    'sent_at' => $email->sent_at ? $email->sent_at->format('Y-m-d H:i:s') : '',
-                    'status' => $email->status,
-                    'opens' => (int) ($email->opens_count ?? 0),
-                    'clicks' => (int) ($email->clicks_count ?? 0),
-                    'recipient_count' => (int) ($email->recipient_count ?? 0),
+                    'id'               => $email->id,
+                    'project_name'     => $email->project_name,
+                    'subject'          => $email->subject ?? '(No subject)',
+                    'source'           => $email->source,
+                    'sent_at'          => $email->sent_at ? Carbon::parse($email->sent_at)->format('Y-m-d H:i:s') : '',
+                    'status'           => $email->status,
+                    'opens'            => (int) ($email->opens_count ?? 0),
+                    'clicks'           => (int) ($email->clicks_count ?? 0),
+                    'recipient_count'  => (int) ($email->recipient_count ?? 0),
                 ];
             });
 
         return response()->json([
             'success' => true,
-            'data' => $emails,
+            'data'    => $emails,
             'filters' => [
                 'projectIds' => $selectedProjectIds,
-                'dateFrom' => $dateFrom->format('Y-m-d'),
-                'dateTo' => $dateTo->format('Y-m-d'),
-            ]
+                'dateFrom'   => $dateFrom->format('Y-m-d'),
+                'dateTo'     => $dateTo->format('Y-m-d'),
+            ],
         ]);
     }
 
     /**
-     * Report 2: List all mail recipients with total emails sent, total opens, and total clicks
+     * Report 2: Aggregated per-address statistics.
+     *
+     * Replaced whereHas (EXISTS subquery) with a direct JOIN, and fixed
+     * double-quoted string literals that are non-portable to strict MySQL.
      */
     public function recipientsReport(Request $request, ProjectAccessService $projectService)
     {
         $user = auth()->user();
         $accessibleProjectIds = $projectService->getAccessibleProjectIds($user);
-        
-        // Validate and get filters
+
         $request->validate([
             'projectId' => 'nullable|string',
-            'dateFrom' => 'required|date',
-            'dateTo' => 'required|date|after_or_equal:dateFrom',
+            'dateFrom'  => 'required|date',
+            'dateTo'    => 'required|date|after_or_equal:dateFrom',
         ]);
 
-        $projectId = $request->get('projectId', 'all');
-        $dateFrom = Carbon::parse($request->get('dateFrom'))->startOfDay();
-        $dateTo = Carbon::parse($request->get('dateTo'))->endOfDay();
-
-        // Determine which projects to include
-        if ($projectId === 'all' || empty($projectId)) {
-            $selectedProjectIds = $accessibleProjectIds;
-        } else {
-            // Handle comma-separated project IDs
-            if (strpos($projectId, ',') !== false) {
-                $requestedIds = array_map('trim', explode(',', $projectId));
-            } else {
-                $requestedIds = [$projectId];
-            }
-            
-            // Filter to only include accessible project IDs
-            $selectedProjectIds = array_intersect(
-                array_map('intval', $requestedIds),
-                $accessibleProjectIds
-            );
-        }
-
-        if (empty($selectedProjectIds)) {
+        $selectedProjectIds = $this->resolveProjectIds($request, $accessibleProjectIds);
+        if ($selectedProjectIds === null) {
             return response()->json(['error' => 'No accessible projects selected'], 403);
         }
 
-        // Query recipients with aggregated statistics
-        // First get recipients within the project and date range
-        $recipients = EmailRecipient::whereHas('email', function ($query) use ($selectedProjectIds, $dateFrom, $dateTo) {
-                $query->whereIn('project_id', $selectedProjectIds)
-                      ->whereBetween('sent_at', [$dateFrom, $dateTo]);
-            })
-            ->select('email_recipients.address')
-            ->selectRaw('COUNT(DISTINCT email_recipients.email_id) as total_emails')
-            ->selectRaw('COALESCE(SUM(CASE WHEN recipient_events.type = "open" THEN 1 ELSE 0 END), 0) as total_opens')
-            ->selectRaw('COALESCE(SUM(CASE WHEN recipient_events.type = "click" THEN 1 ELSE 0 END), 0) as total_clicks')
-            ->leftJoin('recipient_events', 'email_recipients.id', '=', 'recipient_events.recipient_id')
-            ->groupBy('email_recipients.address')
-            ->orderBy('total_emails', 'desc')
-            ->orderBy('email_recipients.address', 'asc')
+        $dateFrom = Carbon::parse($request->get('dateFrom'))->startOfDay();
+        $dateTo   = Carbon::parse($request->get('dateTo'))->endOfDay();
+
+        $recipients = DB::table('email_recipients as er')
+            ->join('emails as e', 'er.email_id', '=', 'e.id')
+            ->leftJoin('recipient_events as re', 'er.id', '=', 're.recipient_id')
+            ->select('er.address')
+            ->selectRaw('COUNT(DISTINCT er.email_id) as total_emails')
+            ->selectRaw("COALESCE(SUM(CASE WHEN re.type = 'open' THEN 1 ELSE 0 END), 0) as total_opens")
+            ->selectRaw("COALESCE(SUM(CASE WHEN re.type = 'click' THEN 1 ELSE 0 END), 0) as total_clicks")
+            ->whereIn('e.project_id', $selectedProjectIds)
+            ->whereBetween('e.sent_at', [$dateFrom, $dateTo])
+            ->groupBy('er.address')
+            ->orderByDesc('total_emails')
+            ->orderBy('er.address')
             ->get()
             ->map(function ($recipient) {
                 return [
-                    'address' => $recipient->address,
-                    'total_emails' => (int) $recipient->total_emails,
-                    'total_opens' => (int) $recipient->total_opens,
-                    'total_clicks' => (int) $recipient->total_clicks,
+                    'address'       => $recipient->address,
+                    'total_emails'  => (int) $recipient->total_emails,
+                    'total_opens'   => (int) $recipient->total_opens,
+                    'total_clicks'  => (int) $recipient->total_clicks,
                 ];
             });
 
         return response()->json([
             'success' => true,
-            'data' => $recipients,
+            'data'    => $recipients,
             'filters' => [
                 'projectIds' => $selectedProjectIds,
-                'dateFrom' => $dateFrom->format('Y-m-d'),
-                'dateTo' => $dateTo->format('Y-m-d'),
-            ]
+                'dateFrom'   => $dateFrom->format('Y-m-d'),
+                'dateTo'     => $dateTo->format('Y-m-d'),
+            ],
         ]);
     }
 
     /**
-     * Report 3: List all email senders with total opens, total clicks, and status counts
+     * Report 3: Per-sender aggregation.
+     *
+     * Previously loaded every email + recipients + events into PHP for grouping.
+     * Now uses a two-level SQL aggregation (subquery → outer GROUP BY source)
+     * so only one row per unique sender is returned to PHP.
      */
     public function sendersReport(Request $request, ProjectAccessService $projectService)
     {
         $user = auth()->user();
         $accessibleProjectIds = $projectService->getAccessibleProjectIds($user);
-        
-        // Validate and get filters
+
         $request->validate([
             'projectId' => 'nullable|string',
-            'dateFrom' => 'required|date',
-            'dateTo' => 'required|date|after_or_equal:dateFrom',
+            'dateFrom'  => 'required|date',
+            'dateTo'    => 'required|date|after_or_equal:dateFrom',
         ]);
 
-        $projectId = $request->get('projectId', 'all');
-        $dateFrom = Carbon::parse($request->get('dateFrom'))->startOfDay();
-        $dateTo = Carbon::parse($request->get('dateTo'))->endOfDay();
-
-        // Determine which projects to include
-        if ($projectId === 'all' || empty($projectId)) {
-            $selectedProjectIds = $accessibleProjectIds;
-        } else {
-            // Handle comma-separated project IDs
-            if (strpos($projectId, ',') !== false) {
-                $requestedIds = array_map('trim', explode(',', $projectId));
-            } else {
-                $requestedIds = [$projectId];
-            }
-            
-            // Filter to only include accessible project IDs
-            $selectedProjectIds = array_intersect(
-                array_map('intval', $requestedIds),
-                $accessibleProjectIds
-            );
-        }
-
-        if (empty($selectedProjectIds)) {
+        $selectedProjectIds = $this->resolveProjectIds($request, $accessibleProjectIds);
+        if ($selectedProjectIds === null) {
             return response()->json(['error' => 'No accessible projects selected'], 403);
         }
 
-        // Get emails with their events
-        $emails = Email::whereIn('project_id', $selectedProjectIds)
-            ->whereBetween('sent_at', [$dateFrom, $dateTo])
-            ->withCount([
-                'events as opens_count' => function ($query) {
-                    $query->where('type', 'open');
-                },
-                'events as clicks_count' => function ($query) {
-                    $query->where('type', 'click');
-                }
-            ])
-            ->with('recipients')
-            ->get();
+        $dateFrom = Carbon::parse($request->get('dateFrom'))->startOfDay();
+        $dateTo   = Carbon::parse($request->get('dateTo'))->endOfDay();
 
-        // Aggregate by sender (source)
-        $sendersData = [];
-        
-        foreach ($emails as $email) {
-            $source = $email->source ?? '(Unknown)';
-            
-            if (!isset($sendersData[$source])) {
-                $sendersData[$source] = [
-                    'sender' => $source,
-                    'total_emails' => 0,
-                    'total_opens' => 0,
-                    'total_clicks' => 0,
-                    'status_counts' => [
-                        'delivered' => 0,
-                        'sent' => 0,
-                        'bounced' => 0,
-                        'complained' => 0,
-                    ]
+        // Inner query: one row per email with its computed status, opens, and clicks
+        $perEmailQuery = DB::table('emails as e')
+            ->leftJoin('email_recipients as er', 'e.id', '=', 'er.email_id')
+            ->leftJoin('recipient_events as re', 'er.id', '=', 're.recipient_id')
+            ->select('e.id', 'e.source')
+            ->selectRaw("SUM(CASE WHEN re.type = 'open' THEN 1 ELSE 0 END) as opens_count")
+            ->selectRaw("SUM(CASE WHEN re.type = 'click' THEN 1 ELSE 0 END) as clicks_count")
+            ->selectRaw("CASE
+                WHEN MAX(CASE WHEN er.status IN ('bounced', 'rejected') THEN 1 ELSE 0 END) = 1 THEN 'bounced'
+                WHEN MAX(CASE WHEN er.status = 'complained' THEN 1 ELSE 0 END) = 1 THEN 'complained'
+                WHEN MAX(CASE WHEN er.status = 'delivered' THEN 1 ELSE 0 END) = 1 THEN 'delivered'
+                ELSE 'sent'
+            END as email_status")
+            ->whereIn('e.project_id', $selectedProjectIds)
+            ->whereBetween('e.sent_at', [$dateFrom, $dateTo])
+            ->groupBy('e.id', 'e.source');
+
+        // Outer query: aggregate per sender
+        $senders = DB::table($perEmailQuery, 'email_data')
+            ->select('source')
+            ->selectRaw('COUNT(*) as total_emails')
+            ->selectRaw('SUM(opens_count) as total_opens')
+            ->selectRaw('SUM(clicks_count) as total_clicks')
+            ->selectRaw("SUM(CASE WHEN email_status = 'bounced'   THEN 1 ELSE 0 END) as status_bounced")
+            ->selectRaw("SUM(CASE WHEN email_status = 'complained' THEN 1 ELSE 0 END) as status_complained")
+            ->selectRaw("SUM(CASE WHEN email_status = 'delivered'  THEN 1 ELSE 0 END) as status_delivered")
+            ->selectRaw("SUM(CASE WHEN email_status = 'sent'       THEN 1 ELSE 0 END) as status_sent")
+            ->groupBy('source')
+            ->orderByDesc('total_emails')
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'sender'             => $row->source ?? '(Unknown)',
+                    'total_emails'       => (int) $row->total_emails,
+                    'total_opens'        => (int) $row->total_opens,
+                    'total_clicks'       => (int) $row->total_clicks,
+                    'status_delivered'   => (int) $row->status_delivered,
+                    'status_sent'        => (int) $row->status_sent,
+                    'status_bounced'     => (int) $row->status_bounced,
+                    'status_complained'  => (int) $row->status_complained,
+                    'status_other'       => 0,
                 ];
-            }
-            
-            $sendersData[$source]['total_emails']++;
-            $sendersData[$source]['total_opens'] += (int) ($email->opens_count ?? 0);
-            $sendersData[$source]['total_clicks'] += (int) ($email->clicks_count ?? 0);
-            
-            // Count statuses from recipients
-            $status = $email->status;
-            if (isset($sendersData[$source]['status_counts'][$status])) {
-                $sendersData[$source]['status_counts'][$status]++;
-            } else {
-                // Handle unknown statuses
-                if (!isset($sendersData[$source]['status_counts']['other'])) {
-                    $sendersData[$source]['status_counts']['other'] = 0;
-                }
-                $sendersData[$source]['status_counts']['other']++;
-            }
-        }
-
-        // Convert to array and sort
-        $senders = collect($sendersData)->map(function ($data) {
-            return [
-                'sender' => $data['sender'],
-                'total_emails' => $data['total_emails'],
-                'total_opens' => $data['total_opens'],
-                'total_clicks' => $data['total_clicks'],
-                'status_delivered' => $data['status_counts']['delivered'] ?? 0,
-                'status_sent' => $data['status_counts']['sent'] ?? 0,
-                'status_bounced' => $data['status_counts']['bounced'] ?? 0,
-                'status_complained' => $data['status_counts']['complained'] ?? 0,
-                'status_other' => $data['status_counts']['other'] ?? 0,
-            ];
-        })
-        ->sortByDesc('total_emails')
-        ->values()
-        ->toArray();
+            });
 
         return response()->json([
             'success' => true,
-            'data' => $senders,
+            'data'    => $senders,
             'filters' => [
                 'projectIds' => $selectedProjectIds,
-                'dateFrom' => $dateFrom->format('Y-m-d'),
-                'dateTo' => $dateTo->format('Y-m-d'),
-            ]
+                'dateFrom'   => $dateFrom->format('Y-m-d'),
+                'dateTo'     => $dateTo->format('Y-m-d'),
+            ],
         ]);
     }
 
     /**
-     * Report 4: List all bounced email recipients with bounce type and bounce subtype
+     * Report 4: Bounced recipients with bounce type and subtype.
+     *
+     * Replaced whereHas + eager-loaded relationship chain with a direct JOIN
+     * that selects only the columns needed for the response.
      */
     public function bouncedRecipientsReport(Request $request, ProjectAccessService $projectService)
     {
         $user = auth()->user();
         $accessibleProjectIds = $projectService->getAccessibleProjectIds($user);
-        
-        // Validate and get filters
+
         $request->validate([
             'projectId' => 'nullable|string',
-            'dateFrom' => 'required|date',
-            'dateTo' => 'required|date|after_or_equal:dateFrom',
+            'dateFrom'  => 'required|date',
+            'dateTo'    => 'required|date|after_or_equal:dateFrom',
         ]);
 
-        $projectId = $request->get('projectId', 'all');
-        $dateFrom = Carbon::parse($request->get('dateFrom'))->startOfDay();
-        $dateTo = Carbon::parse($request->get('dateTo'))->endOfDay();
-
-        // Determine which projects to include
-        if ($projectId === 'all' || empty($projectId)) {
-            $selectedProjectIds = $accessibleProjectIds;
-        } else {
-            // Handle comma-separated project IDs
-            if (strpos($projectId, ',') !== false) {
-                $requestedIds = array_map('trim', explode(',', $projectId));
-            } else {
-                $requestedIds = [$projectId];
-            }
-            
-            // Filter to only include accessible project IDs
-            $selectedProjectIds = array_intersect(
-                array_map('intval', $requestedIds),
-                $accessibleProjectIds
-            );
-        }
-
-        if (empty($selectedProjectIds)) {
+        $selectedProjectIds = $this->resolveProjectIds($request, $accessibleProjectIds);
+        if ($selectedProjectIds === null) {
             return response()->json(['error' => 'No accessible projects selected'], 403);
         }
 
-        // Query bounce events with recipient information
-        $bounceEvents = \App\Models\RecipientEvent::where('type', 'bounce')
-            ->whereBetween('event_at', [$dateFrom, $dateTo])
-            ->whereHas('recipient.email', function ($query) use ($selectedProjectIds) {
-                $query->whereIn('project_id', $selectedProjectIds);
-            })
-            ->with(['recipient.email.project'])
-            ->orderBy('event_at', 'desc')
-            ->get();
+        $dateFrom = Carbon::parse($request->get('dateFrom'))->startOfDay();
+        $dateTo   = Carbon::parse($request->get('dateTo'))->endOfDay();
 
-        // Process bounce events and extract bounce details from payload
-        $bouncedRecipients = $bounceEvents->map(function ($event) {
-            $payload = $event->payload ?? [];
-            $bounce = $payload['bounce'] ?? [];
-            
-            // Extract bounce type and subtype
-            $bounceType = $bounce['bounceType'] ?? 'Unknown';
-            $bounceSubType = $bounce['bounceSubType'] ?? 'Unknown';
-            
-            // Get recipient email address
-            $recipientAddress = $event->recipient->address ?? 'Unknown';
-            
-            // Get email subject and source
-            $email = $event->recipient->email ?? null;
-            $subject = $email->subject ?? '(No subject)';
-            $source = $email->source ?? 'Unknown';
-            $projectName = $email->project->name ?? 'Unknown';
-            
-            return [
-                'recipient_address' => $recipientAddress,
-                'bounce_type' => $bounceType,
-                'bounce_subtype' => $bounceSubType,
-                'bounced_at' => $event->event_at ? $event->event_at->format('Y-m-d H:i:s') : '',
-                'project_name' => $projectName,
-                'email_subject' => $subject,
-                'email_source' => $source,
-            ];
-        });
+        $bounceEvents = DB::table('recipient_events as re')
+            ->join('email_recipients as er', 're.recipient_id', '=', 'er.id')
+            ->join('emails as e', 'er.email_id', '=', 'e.id')
+            ->join('projects as p', 'e.project_id', '=', 'p.id')
+            ->select('re.event_at', 're.payload', 'er.address', 'e.subject', 'e.source', 'p.name as project_name')
+            ->where('re.type', 'bounce')
+            ->whereBetween('re.event_at', [$dateFrom, $dateTo])
+            ->whereIn('e.project_id', $selectedProjectIds)
+            ->orderBy('re.event_at', 'desc')
+            ->get()
+            ->map(function ($event) {
+                $payload = json_decode($event->payload ?? '{}', true) ?? [];
+                $bounce = $payload['bounce'] ?? [];
+
+                return [
+                    'recipient_address' => $event->address,
+                    'bounce_type'       => $bounce['bounceType'] ?? 'Unknown',
+                    'bounce_subtype'    => $bounce['bounceSubType'] ?? 'Unknown',
+                    'bounced_at'        => $event->event_at ? Carbon::parse($event->event_at)->format('Y-m-d H:i:s') : '',
+                    'project_name'      => $event->project_name,
+                    'email_subject'     => $event->subject ?? '(No subject)',
+                    'email_source'      => $event->source ?? 'Unknown',
+                ];
+            });
 
         return response()->json([
             'success' => true,
-            'data' => $bouncedRecipients->values()->toArray(),
+            'data'    => $bounceEvents->values()->toArray(),
             'filters' => [
                 'projectIds' => $selectedProjectIds,
-                'dateFrom' => $dateFrom->format('Y-m-d'),
-                'dateTo' => $dateTo->format('Y-m-d'),
-            ]
+                'dateFrom'   => $dateFrom->format('Y-m-d'),
+                'dateTo'     => $dateTo->format('Y-m-d'),
+            ],
         ]);
     }
 }
