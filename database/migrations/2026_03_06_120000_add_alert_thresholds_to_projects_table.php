@@ -1,0 +1,30 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     * Per-project alert thresholds (optional). Defaults match AWS limits: bounce 5%, complaint 0.1%.
+     */
+    public function up(): void
+    {
+        Schema::table('projects', function (Blueprint $table) {
+            $table->decimal('alert_bounce_rate', 5, 2)->nullable()->after('token');
+            $table->decimal('alert_complaint_rate', 5, 2)->nullable()->after('alert_bounce_rate');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('projects', function (Blueprint $table) {
+            $table->dropColumn(['alert_bounce_rate', 'alert_complaint_rate']);
+        });
+    }
+};

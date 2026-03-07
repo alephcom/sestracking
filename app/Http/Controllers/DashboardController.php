@@ -58,7 +58,11 @@ class DashboardController extends Controller
                     'opens' => 0,
                     'clicks' => 0,
                     'notDelivered' => 0,
+                    'bounce' => 0,
+                    'complaint' => 0,
                 ],
+                'bounceRate' => 0,
+                'complaintRate' => 0,
                 'chartData' => [
                     'labels' => [],
                     'datasets' => [],
@@ -111,13 +115,22 @@ class DashboardController extends Controller
             + ($counters['bounce'] ?? 0)
             + ($counters['reject'] ?? 0);
 
+        $sent = $counters['send'] ?? 0;
+        $bounceCount = $counters['bounce'] ?? 0;
+        $complaintCount = $counters['complaint'] ?? 0;
+
         $counterResults = [
-            'sent' => $counters['send'] ?? 0,
+            'sent' => $sent,
             'delivered' => $counters['delivery'] ?? 0,
             'opens' => $counters['open'] ?? 0,
             'clicks' => $counters['click'] ?? 0,
             'notDelivered' => $notDelivered,
+            'bounce' => $bounceCount,
+            'complaint' => $complaintCount,
         ];
+
+        $bounceRate = $sent > 0 ? round($bounceCount / $sent * 100, 2) : 0;
+        $complaintRate = $sent > 0 ? round($complaintCount / $sent * 100, 2) : 0;
 
         $chartData = $this->buildChartData($selectedProjectIds, $dateFrom, $dateTo, $tzOffset);
 
@@ -127,6 +140,8 @@ class DashboardController extends Controller
 
         return [
             'counters' => $counterResults,
+            'bounceRate' => $bounceRate,
+            'complaintRate' => $complaintRate,
             'chartData' => $chartData,
             'total_emails' => $totalEmails,
         ];

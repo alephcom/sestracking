@@ -8,7 +8,12 @@ use Illuminate\Database\Eloquent\Model;
 class Project extends Model
 {
     use HasFactory;
-    protected $fillable = ['name', 'token'];
+    protected $fillable = ['name', 'token', 'alert_bounce_rate', 'alert_complaint_rate'];
+
+    protected $casts = [
+        'alert_bounce_rate' => 'float',
+        'alert_complaint_rate' => 'float',
+    ];
 
     /**
      * Get users that have access to this project

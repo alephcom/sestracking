@@ -12,6 +12,8 @@ class DashboardApp {
       endDate: moment().locale(window.navigator.language).endOf('week').utc().toDate()
     };
     this.counters = {};
+    this.bounceRate = 0;
+    this.complaintRate = 0;
     this.chart = null;
     this.chartCanvas = null;
     this.chartColors = {
@@ -128,6 +130,8 @@ class DashboardApp {
     })
       .then(response => {
         this.counters = response.data.counters;
+        this.bounceRate = response.data.bounceRate;
+        this.complaintRate = response.data.complaintRate;
         this.renderCounters();
         this.fillChartData(response.data.chartData);
       })
@@ -139,6 +143,28 @@ class DashboardApp {
       });
   }
 
+  getBounceRateBadge() {
+    const sent = this.counters.sent || 0;
+    const rate = this.bounceRate;
+    if (sent === 0) return '<span class="badge bg-secondary">—</span>';
+    let bg = 'bg-success';
+    if (rate >= 5) bg = 'bg-danger';
+    else if (rate >= 2) bg = 'bg-warning text-dark';
+    const label = rate >= 5 ? `${rate}% — Above AWS limit` : `${rate}%`;
+    return `<span class="badge ${bg}">${label}</span>`;
+  }
+
+  getComplaintRateBadge() {
+    const sent = this.counters.sent || 0;
+    const rate = this.complaintRate;
+    if (sent === 0) return '<span class="badge bg-secondary">—</span>';
+    let bg = 'bg-success';
+    if (rate > 0.1) bg = 'bg-danger';
+    else if (rate >= 0.08) bg = 'bg-warning text-dark';
+    const label = rate > 0.1 ? `${rate}% — Above AWS limit` : `${rate}%`;
+    return `<span class="badge ${bg}">${label}</span>`;
+  }
+
   renderCounters() {
     const countersContainer = document.getElementById('counters-cards');
     if (!countersContainer) return;
@@ -148,6 +174,8 @@ class DashboardApp {
     const opens        = this.counters.opens        || 0;
     const clicks       = this.counters.clicks       || 0;
     const notDelivered = this.counters.notDelivered || 0;
+    const bounce       = this.counters.bounce       || 0;
+    const complaint    = this.counters.complaint    || 0;
 
     const deliveredPercent    = sent ? ((delivered    / sent) * 100).toFixed(1) : 0;
     const notDeliveredPercent = sent ? ((notDelivered / sent) * 100).toFixed(1) : 0;
@@ -204,6 +232,28 @@ class DashboardApp {
               <div class="text-uppercase text-muted small fw-semibold mb-1">Not Delivered</div>
               <div class="fs-3 fw-bold text-danger">${fmt(notDelivered)}</div>
               <div class="text-muted small">${fmt(notDeliveredPercent)}%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-6 col-md">
+          <div class="card text-center h-100">
+            <div class="card-body py-4">
+              <i class="fas fa-undo fa-2x text-warning mb-3"></i>
+              <div class="text-uppercase text-muted small fw-semibold mb-1">Bounced</div>
+              <div class="fs-3 fw-bold text-warning">${fmt(bounce)}</div>
+              <div class="mt-2">${this.getBounceRateBadge()}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-6 col-md">
+          <div class="card text-center h-100">
+            <div class="card-body py-4">
+              <i class="fas fa-flag fa-2x text-danger mb-3"></i>
+              <div class="text-uppercase text-muted small fw-semibold mb-1">Complaint</div>
+              <div class="fs-3 fw-bold text-danger">${fmt(complaint)}</div>
+              <div class="mt-2">${this.getComplaintRateBadge()}</div>
             </div>
           </div>
         </div>

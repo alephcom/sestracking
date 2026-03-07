@@ -3,11 +3,15 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Models\{Project, Email, EmailRecipient, RecipientEvent};
+use App\Notifications\BounceRateAlert;
 use function Sentry\withScope;
 use function Sentry\captureMessage;
 
@@ -245,6 +249,61 @@ class SesWebhookController extends Controller
             }
         }
 
+        $this->checkRateThresholdsAndNotify($project);
+
         return response('OK');
+    }
+
+    /**
+     * Check rolling 24h bounce/complaint rates and notify project admins if thresholds are exceeded.
+     * Alerts are suppressed for 6 hours per project per metric to avoid repeat emails.
+     */
+    private function checkRateThresholdsAndNotify(Project $project): void
+    {
+        $since = now()->subDay();
+        $eventsCount = DB::table('recipient_events as re')
+            ->join('email_recipients as er', 're.recipient_id', '=', 'er.id')
+            ->join('emails as e', 'er.email_id', '=', 'e.id')
+            ->where('e.project_id', $project->id)
+            ->where('re.event_at', '>=', $since)
+            ->selectRaw('re.type, COUNT(*) as count')
+            ->groupBy('re.type')
+            ->get();
+
+        $counters = [];
+        foreach ($eventsCount as $row) {
+            $counters[$row->type] = (int) $row->count;
+        }
+        $sent = $counters['send'] ?? 0;
+        if ($sent === 0) {
+            return;
+        }
+
+        $bounceCount = $counters['bounce'] ?? 0;
+        $complaintCount = $counters['complaint'] ?? 0;
+        $bounceRate = round($bounceCount / $sent * 100, 2);
+        $complaintRate = round($complaintCount / $sent * 100, 2);
+
+        $bounceThreshold = (float) ($project->alert_bounce_rate ?? 5.0);
+        $complaintThreshold = (float) ($project->alert_complaint_rate ?? 0.1);
+
+        $bounceCacheKey = 'alert-sent:' . $project->id . ':bounce';
+        $complaintCacheKey = 'alert-sent:' . $project->id . ':complaint';
+
+        if ($bounceRate > $bounceThreshold && ! Cache::get($bounceCacheKey)) {
+            $admins = $project->admins()->get();
+            if ($admins->isNotEmpty()) {
+                Notification::send($admins, new BounceRateAlert($project, 'bounce', $bounceRate));
+                Cache::put($bounceCacheKey, true, now()->addHours(6));
+            }
+        }
+
+        if ($complaintRate > $complaintThreshold && ! Cache::get($complaintCacheKey)) {
+            $admins = $project->admins()->get();
+            if ($admins->isNotEmpty()) {
+                Notification::send($admins, new BounceRateAlert($project, 'complaint', $complaintRate));
+                Cache::put($complaintCacheKey, true, now()->addHours(6));
+            }
+        }
     }
 }
