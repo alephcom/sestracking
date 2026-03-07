@@ -21,7 +21,7 @@ class LoginLogoutTest extends TestCase
         $user = User::factory()->create([
             'email' => 'test-admin@example.com',
             'password' => bcrypt('password'),
-            'role' => User::ROLE_ADMIN
+            'super_admin' => true
         ]);
 
         $response = $this->post('/login', [
@@ -29,7 +29,7 @@ class LoginLogoutTest extends TestCase
             'password' => 'password'
         ]);
 
-        $response->assertRedirect('/');
+        $response->assertRedirect('/dashboard');
         $this->assertAuthenticatedAs($user);
     }
 
@@ -39,7 +39,7 @@ class LoginLogoutTest extends TestCase
         $user = User::factory()->create([
             'email' => 'test-user@example.com',
             'password' => bcrypt('password'),
-            'role' => User::ROLE_USER
+            'super_admin' => false
         ]);
 
         $response = $this->post('/login', [
@@ -47,7 +47,7 @@ class LoginLogoutTest extends TestCase
             'password' => 'password'
         ]);
 
-        $response->assertRedirect('/');
+        $response->assertRedirect('/dashboard');
         $this->assertAuthenticatedAs($user);
     }
 

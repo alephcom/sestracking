@@ -14,7 +14,7 @@ class UserRoleAuthorizationTest extends TestCase
     /** @test */
     public function admin_access_to_admin_only_routes()
     {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $admin = User::factory()->create(['super_admin' => true]);
         
         $this->actingAs($admin);
 
@@ -29,7 +29,7 @@ class UserRoleAuthorizationTest extends TestCase
     /** @test */
     public function regular_user_blocked_from_admin_routes()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         
         $this->actingAs($user);
 
@@ -69,7 +69,7 @@ class UserRoleAuthorizationTest extends TestCase
     /** @test */
     public function user_accessing_their_own_profile()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         
         $this->actingAs($user);
 
@@ -80,7 +80,7 @@ class UserRoleAuthorizationTest extends TestCase
     /** @test */
     public function authenticated_users_can_access_general_routes()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         
         $this->actingAs($user);
 
@@ -101,7 +101,7 @@ class UserRoleAuthorizationTest extends TestCase
     /** @test */
     public function admin_users_can_access_all_routes()
     {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $admin = User::factory()->create(['super_admin' => true]);
         
         $this->actingAs($admin);
 

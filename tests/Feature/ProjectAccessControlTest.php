@@ -25,7 +25,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function admin_sees_all_projects_data()
     {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $admin = User::factory()->create(['super_admin' => true]);
         $project1 = Project::factory()->create(['name' => 'Project 1']);
         $project2 = Project::factory()->create(['name' => 'Project 2']);
         
@@ -48,7 +48,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function regular_user_sees_only_assigned_projects_data()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         $project1 = Project::factory()->create(['name' => 'Project 1']);
         $project2 = Project::factory()->create(['name' => 'Project 2']);
         
@@ -78,7 +78,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function user_with_no_projects_sees_appropriate_message()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         // Don't assign any projects
         
         $this->actingAs($user);
@@ -94,7 +94,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function project_dropdown_shows_only_accessible_projects()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         $project1 = Project::factory()->create(['name' => 'Accessible Project']);
         $project2 = Project::factory()->create(['name' => 'Inaccessible Project']);
         
@@ -116,7 +116,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function api_requests_validate_project_access()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         $project1 = Project::factory()->create(['name' => 'Accessible Project']);
         $project2 = Project::factory()->create(['name' => 'Inaccessible Project']);
         
@@ -138,7 +138,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function admin_can_view_emails_from_all_projects()
     {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $admin = User::factory()->create(['super_admin' => true]);
         $project1 = Project::factory()->create();
         $project2 = Project::factory()->create();
         
@@ -161,7 +161,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function regular_user_can_view_only_assigned_project_emails()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         $project1 = Project::factory()->create();
         $project2 = Project::factory()->create();
         
@@ -188,7 +188,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function project_filtering_respects_user_permissions()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         $project1 = Project::factory()->create();
         $project2 = Project::factory()->create();
         
@@ -214,7 +214,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function email_details_api_validates_project_access()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         $project1 = Project::factory()->create();
         $project2 = Project::factory()->create();
         
@@ -242,7 +242,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function admin_can_export_from_all_projects()
     {
-        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $admin = User::factory()->create(['super_admin' => true]);
         $project1 = Project::factory()->create();
         $project2 = Project::factory()->create();
         
@@ -263,7 +263,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function regular_user_can_export_only_assigned_projects()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         $project1 = Project::factory()->create();
         $project2 = Project::factory()->create();
         
@@ -284,7 +284,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function export_with_invalid_project_id_returns_403()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         $project1 = Project::factory()->create();
         
         // Assign user to project 1
@@ -300,7 +300,7 @@ class ProjectAccessControlTest extends TestCase
     /** @test */
     public function export_respects_project_filtering()
     {
-        $user = User::factory()->create(['role' => User::ROLE_USER]);
+        $user = User::factory()->create(['super_admin' => false]);
         $project1 = Project::factory()->create();
         $project2 = Project::factory()->create();
         

@@ -15,20 +15,20 @@ class AuthenticationTest extends TestCase
     {
         parent::setUp();
         
-        // Create test users
+        // Create test users (super_admin for platform admin, no role column on users table)
         User::create([
             'id' => 1,
             'name' => 'Admin User',
             'email' => 'admin@example.com',
             'password' => Hash::make('password123'),
-            'role' => User::ROLE_ADMIN,
+            'super_admin' => true,
         ]);
 
         User::create([
             'name' => 'Regular User',
             'email' => 'user@example.com',
             'password' => Hash::make('password123'),
-            'role' => User::ROLE_USER,
+            'super_admin' => false,
         ]);
     }
 
@@ -39,10 +39,10 @@ class AuthenticationTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $response->assertRedirect('/');
+        $response->assertRedirect('/dashboard');
         $this->assertAuthenticated();
         $this->assertEquals('admin@example.com', auth()->user()->email);
-        $this->assertTrue(auth()->user()->isAdmin());
+        $this->assertTrue(auth()->user()->isSuperAdmin());
     }
 
     public function test_login_with_valid_regular_user_credentials()
@@ -52,10 +52,10 @@ class AuthenticationTest extends TestCase
             'password' => 'password123',
         ]);
 
-        $response->assertRedirect('/');
+        $response->assertRedirect('/dashboard');
         $this->assertAuthenticated();
         $this->assertEquals('user@example.com', auth()->user()->email);
-        $this->assertFalse(auth()->user()->isAdmin());
+        $this->assertFalse(auth()->user()->isSuperAdmin());
     }
 
     public function test_login_with_invalid_email()
@@ -146,7 +146,7 @@ class AuthenticationTest extends TestCase
     public function test_unauthenticated_user_redirected_to_login()
     {
         $protectedRoutes = [
-            '/',
+            '/dashboard',
             '/dashboard/api',
             '/activity',
             '/activity/list/api',
@@ -167,7 +167,7 @@ class AuthenticationTest extends TestCase
         $user = User::where('email', 'admin@example.com')->first();
         $this->actingAs($user);
 
-        $response = $this->get('/');
+        $response = $this->get('/dashboard');
         $response->assertOk();
 
         $response = $this->get('/activity');
