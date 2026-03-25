@@ -34,6 +34,12 @@
       </div>
     @endif
 
+    @if(session('success'))
+      <div class="alert alert-success mb-4" role="alert">
+        <i class="fas fa-check-circle me-2"></i>{{ session('success') }}
+      </div>
+    @endif
+
     @if($errors->any())
       <div class="alert alert-danger mb-4" role="alert">
         <i class="fas fa-exclamation-circle me-2"></i>{{ $errors->first() }}
@@ -99,7 +105,7 @@
         </div>
       </div>
 
-      <div class="mb-4">
+      <div class="mb-2">
         <label for="inputPassword" class="form-label visually-hidden">Password</label>
         <div class="input-group">
           <span class="input-group-text"><i class="fas fa-lock text-muted"></i></span>
@@ -110,6 +116,10 @@
                  placeholder="Password"
                  required>
         </div>
+      </div>
+
+      <div class="mb-4 text-end">
+        <a href="{{ route('password.request') }}" class="small text-decoration-none">Forgot password?</a>
       </div>
 
       <button class="btn btn-primary w-100 btn-signin" type="submit">

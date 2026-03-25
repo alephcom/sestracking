@@ -3,16 +3,18 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Auth\Passwords\CanResetPassword;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use CanResetPassword, HasFactory, Notifiable;
 
     // Role constants for project_user pivot table
     const ROLE_ADMIN = 'admin';
+
     const ROLE_USER = 'user';
 
     /**
@@ -79,8 +81,9 @@ class User extends Authenticatable
         if ($this->isSuperAdmin()) {
             return true;
         }
-        
+
         $project = $this->projects->find($project->id);
+
         return $project && $project->pivot->role === self::ROLE_ADMIN;
     }
 
@@ -93,10 +96,10 @@ class User extends Authenticatable
         if ($this->isSuperAdmin()) {
             return true;
         }
-        
+
         return $this->projects->contains($project);
     }
-    
+
     /**
      * Check if user is admin for any project (including super admin)
      */
@@ -105,10 +108,10 @@ class User extends Authenticatable
         if ($this->isSuperAdmin()) {
             return true;
         }
-        
+
         return $this->projects()->wherePivot('role', self::ROLE_ADMIN)->exists();
     }
-    
+
     /**
      * Get role for a specific project
      */
@@ -118,8 +121,9 @@ class User extends Authenticatable
         if ($this->isSuperAdmin()) {
             return self::ROLE_ADMIN;
         }
-        
+
         $project = $this->projects->find($project->id);
+
         return $project ? $project->pivot->role : null;
     }
 }

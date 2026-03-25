@@ -3,20 +3,24 @@
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\SendTestController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\WebHookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('login', [AuthController::class, 'login'])->name('login');
+Route::post('login', [AuthController::class, 'login'])->name('login');
 
+Route::get('forgot-password', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
+Route::post('forgot-password', [PasswordResetController::class, 'sendResetLink'])->name('password.email');
+Route::get('reset-password/{token}', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
+Route::post('reset-password', [PasswordResetController::class, 'reset'])->name('password.update');
 
-Route::get('login',[AuthController::class,'login'])->name('login');
-Route::post('login',[AuthController::class,'login'])->name('login');
 Route::post('webhook/{token}', App\Http\Controllers\SesWebhookController::class);
 
 // Invitation routes (public)
@@ -31,31 +35,29 @@ Route::get('auth/{provider}/callback', [SocialAuthController::class, 'callback']
     ->where('provider', 'google|microsoft')
     ->name('social.callback');
 
-
-
 Route::group([
-    'middleware' => ['auth']
+    'middleware' => ['auth'],
 ], function () {
 
-Route::get('logout',[AuthController::class,'logout'])->name('logout');
-Route::get('/dashboard',[DashboardController::class,'index'])->name('dashboard.index');
-Route::get('dashboard/api',[DashboardController::class,'jsApi'])->name('dashboard.api');
-Route::get('activity',[ActivityController::class,'index'])->name('activity');
-Route::get('activity/list/api',[ActivityController::class,'listApi']);
-Route::get('activity/details/api',[ActivityController::class,'detailsApi']); 
-Route::get('activity/export',[ActivityController::class,'export']);
-Route::get('reports',[App\Http\Controllers\ReportsController::class,'index'])->name('reports.index');
-Route::get('reports/emails',[App\Http\Controllers\ReportsController::class,'emailsReport'])->name('reports.emails');
-Route::get('reports/recipients',[App\Http\Controllers\ReportsController::class,'recipientsReport'])->name('reports.recipients');
-Route::get('reports/senders',[App\Http\Controllers\ReportsController::class,'sendersReport'])->name('reports.senders');
-Route::get('reports/bounced-recipients',[App\Http\Controllers\ReportsController::class,'bouncedRecipientsReport'])->name('reports.bounced-recipients'); 
-Route::get('send_test',[SendTestController::class,'index'])->name('send_test');
-Route::post('send_test/send',[SendTestController::class,'send'])->name('send_test.send');
-Route::any('edit_profile',[UserController::class,'edit'])->name('edit_profile');
+    Route::get('logout', [AuthController::class, 'logout'])->name('logout');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
+    Route::get('dashboard/api', [DashboardController::class, 'jsApi'])->name('dashboard.api');
+    Route::get('activity', [ActivityController::class, 'index'])->name('activity');
+    Route::get('activity/list/api', [ActivityController::class, 'listApi']);
+    Route::get('activity/details/api', [ActivityController::class, 'detailsApi']);
+    Route::get('activity/export', [ActivityController::class, 'export']);
+    Route::get('reports', [App\Http\Controllers\ReportsController::class, 'index'])->name('reports.index');
+    Route::get('reports/emails', [App\Http\Controllers\ReportsController::class, 'emailsReport'])->name('reports.emails');
+    Route::get('reports/recipients', [App\Http\Controllers\ReportsController::class, 'recipientsReport'])->name('reports.recipients');
+    Route::get('reports/senders', [App\Http\Controllers\ReportsController::class, 'sendersReport'])->name('reports.senders');
+    Route::get('reports/bounced-recipients', [App\Http\Controllers\ReportsController::class, 'bouncedRecipientsReport'])->name('reports.bounced-recipients');
+    Route::get('send_test', [SendTestController::class, 'index'])->name('send_test');
+    Route::post('send_test/send', [SendTestController::class, 'send'])->name('send_test.send');
+    Route::any('edit_profile', [UserController::class, 'edit'])->name('edit_profile');
 
-// Project request routes (available to all authenticated users)
-Route::get('project-requests/create', [App\Http\Controllers\ProjectRequestController::class, 'create'])->name('project-requests.create');
-Route::post('project-requests', [App\Http\Controllers\ProjectRequestController::class, 'store'])->name('project-requests.store');
+    // Project request routes (available to all authenticated users)
+    Route::get('project-requests/create', [App\Http\Controllers\ProjectRequestController::class, 'create'])->name('project-requests.create');
+    Route::post('project-requests', [App\Http\Controllers\ProjectRequestController::class, 'store'])->name('project-requests.store');
 
 });
 
