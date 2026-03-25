@@ -93,6 +93,28 @@ class TwoFactorAuthenticationTest extends TestCase
         $this->assertAuthenticatedAs($user->fresh());
     }
 
+    public function test_remember_me_is_applied_after_successful_challenge(): void
+    {
+        $user = User::factory()->withTwoFactorEnrolled()->create([
+            'email' => 'remember@example.com',
+            'password' => Hash::make('secret123'),
+        ]);
+
+        $this->post('/login', [
+            'email' => 'remember@example.com',
+            'password' => 'secret123',
+            'submit' => true,
+            'remember' => '1',
+        ]);
+
+        $code = (new Google2FA)->getCurrentOtp((string) $user->fresh()->two_factor_secret);
+        $this->post(route('two-factor.challenge.confirm'), [
+            'code' => $code,
+        ]);
+
+        $this->assertNotNull($user->fresh()->remember_token);
+    }
+
     public function test_sso_user_can_access_dashboard_without_two_factor(): void
     {
         $user = User::factory()->create([
@@ -137,5 +159,26 @@ class TwoFactorAuthenticationTest extends TestCase
         ]);
 
         $this->assertSame(1, $exit);
+    }
+
+    public function test_challenge_cancel_requires_post_and_clears_pending_session(): void
+    {
+        $user = User::factory()->withTwoFactorEnrolled()->create([
+            'email' => 'cancel@example.com',
+            'password' => Hash::make('secret123'),
+        ]);
+
+        $this->post('/login', [
+            'email' => 'cancel@example.com',
+            'password' => 'secret123',
+            'submit' => true,
+        ]);
+
+        $this->assertTrue(session()->has('login.two_factor_pending_user_id'));
+
+        $this->post(route('two-factor.challenge.cancel'))->assertRedirect(route('login'));
+
+        $this->assertFalse(session()->has('login.two_factor_pending_user_id'));
+        $this->assertGuest();
     }
 }

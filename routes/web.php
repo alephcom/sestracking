@@ -36,21 +36,20 @@ Route::get('auth/{provider}/callback', [SocialAuthController::class, 'callback']
     ->where('provider', 'google|microsoft')
     ->name('social.callback');
 
-Route::get('two-factor/challenge/cancel', [TwoFactorAuthenticationController::class, 'cancelChallenge'])
-    ->name('two-factor.challenge.cancel');
-
-Route::middleware(['throttle:12,1'])->group(function () {
+Route::middleware(['throttle:two-factor-challenge'])->group(function () {
     Route::get('two-factor/challenge', [TwoFactorAuthenticationController::class, 'showChallenge'])
         ->name('two-factor.challenge');
     Route::post('two-factor/challenge', [TwoFactorAuthenticationController::class, 'confirmChallenge'])
         ->name('two-factor.challenge.confirm');
+    Route::post('two-factor/challenge/cancel', [TwoFactorAuthenticationController::class, 'cancelChallenge'])
+        ->name('two-factor.challenge.cancel');
 });
 
 Route::middleware(['auth'])->group(function () {
     Route::get('logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('two-factor/setup', [TwoFactorAuthenticationController::class, 'showSetup'])->name('two-factor.setup');
     Route::post('two-factor/setup', [TwoFactorAuthenticationController::class, 'confirmSetup'])
-        ->middleware('throttle:12,1')
+        ->middleware('throttle:two-factor-setup')
         ->name('two-factor.setup.confirm');
 });
 

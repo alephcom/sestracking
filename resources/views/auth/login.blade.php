@@ -118,6 +118,11 @@
         </div>
       </div>
 
+      <div class="mb-3 form-check">
+        <input type="checkbox" name="remember" id="remember" value="1" class="form-check-input" {{ old('remember') ? 'checked' : '' }}>
+        <label class="form-check-label small" for="remember">Stay signed in on this device</label>
+      </div>
+
       <div class="mb-4 text-end">
         <a href="{{ route('password.request') }}" class="small text-decoration-none">Forgot password?</a>
       </div>

@@ -28,6 +28,7 @@ class AuthController extends Controller
             }
 
             $request->session()->put('login.two_factor_pending_user_id', $user->id);
+            $request->session()->put('login.two_factor_remember', $request->boolean('remember'));
             Auth::logout();
 
             return redirect()->route('two-factor.challenge');

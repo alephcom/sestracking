@@ -77,8 +77,9 @@ class TwoFactorAuthenticationController extends Controller
             ])->withInput();
         }
 
+        $remember = (bool) $request->session()->pull('login.two_factor_remember', false);
         $request->session()->forget('login.two_factor_pending_user_id');
-        Auth::login($user, remember: false);
+        Auth::login($user, remember: $remember);
         $request->session()->regenerate();
 
         return redirect()->intended(route('dashboard.index'));
@@ -169,7 +170,10 @@ class TwoFactorAuthenticationController extends Controller
 
     public function cancelChallenge(Request $request): RedirectResponse
     {
-        $request->session()->forget('login.two_factor_pending_user_id');
+        $request->session()->forget([
+            'login.two_factor_pending_user_id',
+            'login.two_factor_remember',
+        ]);
 
         return redirect()->route('login');
     }

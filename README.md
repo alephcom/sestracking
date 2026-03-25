@@ -144,6 +144,20 @@ Run the test suite:
 vendor/bin/phpunit
 ```
 
+## Two-factor authentication (email / password users)
+
+Users who sign in with email and password (not Google/Microsoft SSO) must enroll an authenticator app (TOTP). Recovery codes are shown once after enrollment.
+
+**Operator lockouts:** Clear 2FA for a user so they can enroll again on next sign-in:
+
+```bash
+php artisan user:reset-two-factor {user@email.com|user_id}
+```
+
+SSO-only users are rejected by that command (they do not use in-app TOTP).
+
+**Application key rotation:** `two_factor_secret` is stored encrypted with your `APP_KEY`. If you run `php artisan key:generate` or change `APP_KEY` without decrypting existing data, existing TOTP secrets become unreadable. After a key rotation, affected users cannot sign in with TOTP until an operator runs `user:reset-two-factor` for each affected account (they set up a new authenticator on next login).
+
 ## Webhook Setup
 
 Configure your AWS SES to send notifications to:

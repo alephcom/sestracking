@@ -46,10 +46,13 @@
       <button class="btn btn-primary w-100 btn-signin mb-3" type="submit">
         <i class="fas fa-check me-2"></i>Continue
       </button>
+    </form>
 
-      <div class="text-center">
-        <a href="{{ route('two-factor.challenge.cancel') }}" class="small text-decoration-none">Cancel and sign in again</a>
-      </div>
+    <form method="post" action="{{ route('two-factor.challenge.cancel') }}" class="text-center">
+      @csrf
+      <button type="submit" class="btn btn-link btn-sm text-decoration-none p-0">
+        Cancel and sign in again
+      </button>
     </form>
   </div>
 </div>
