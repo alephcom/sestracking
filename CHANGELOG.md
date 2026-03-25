@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Artisan command `user:create` to provision local email/password users from the terminal — optional `--password`, `--generate-password`, `--super-admin`, and repeatable `--project=id:role` (role `admin` or `user`)
+- In-app TOTP two-factor authentication for email/password accounts (OAuth users are unchanged); enrollment completes after first sign-in until the user confirms the authenticator
+- Self-service password reset ([Issue #18](https://github.com/alephcom/sestracking/issues/18)): forgot-password link, emailed reset link, and set-new-password flow
+- Audit logging for password reset events
+
+### Security
+- Two-factor challenge flow hardened: per-user rate limiting on verification; abort/cancel uses a CSRF-protected POST; “remember me” is preserved through the 2FA step; documentation updated for the new behavior
+
 ### Performance
 - Added database indexes on `recipient_events.event_at`, `recipient_events.recipient_id`, `emails.sent_at`, and `emails.source` — eliminates full-table scans on the largest tables, the single biggest factor in slow dashboard loads at scale
 - Added MySQL `FULLTEXT` indexes on `emails.subject` and `email_recipients.address` for future full-text search support
