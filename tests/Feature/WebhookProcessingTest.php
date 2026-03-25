@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Models\Project;
 use App\Models\Email;
 use App\Models\EmailRecipient;
+use App\Models\Project;
 use App\Models\RecipientEvent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -30,14 +30,14 @@ class WebhookProcessingTest extends TestCase
         $confirmationPayload = [
             'Type' => 'SubscriptionConfirmation',
             'MessageId' => 'test-message-id',
-            'SubscribeURL' => 'https://sns.amazonaws.com/subscription-confirm-url'
+            'SubscribeURL' => 'https://sns.amazonaws.com/subscription-confirm-url',
         ];
 
         $response = $this->postJson('/webhook/test-token-123', $confirmationPayload);
 
         $response->assertOk();
         $response->assertSeeText('OK');
-        
+
         Http::assertSent(function ($request) {
             return $request->url() === 'https://sns.amazonaws.com/subscription-confirm-url';
         });
@@ -47,7 +47,7 @@ class WebhookProcessingTest extends TestCase
     public function webhook_validates_sns_message_structure()
     {
         $response = $this->call('POST', '/webhook/test-token-123', [], [], [], [], 'invalid-json');
-        
+
         $response->assertStatus(400);
         $response->assertSeeText('Bad JSON');
     }
@@ -62,9 +62,9 @@ class WebhookProcessingTest extends TestCase
                 'destination' => ['recipient@example.com'],
                 'timestamp' => '2025-01-01T10:00:00.000Z',
                 'commonHeaders' => [
-                    'subject' => 'Test Email Subject'
-                ]
-            ]
+                    'subject' => 'Test Email Subject',
+                ],
+            ],
         ]);
 
         $response = $this->postJson('/webhook/test-token-123', $sendPayload);
@@ -77,17 +77,17 @@ class WebhookProcessingTest extends TestCase
             'project_id' => $this->project->id,
             'message_id' => 'send-message-123',
             'source' => 'test@example.com',
-            'subject' => 'Test Email Subject'
+            'subject' => 'Test Email Subject',
         ]);
 
         // Verify recipient was created
         $this->assertDatabaseHas('email_recipients', [
-            'address' => 'recipient@example.com'
+            'address' => 'recipient@example.com',
         ]);
 
         // Verify event was recorded
         $this->assertDatabaseHas('recipient_events', [
-            'type' => 'send'
+            'type' => 'send',
         ]);
     }
 
@@ -101,13 +101,13 @@ class WebhookProcessingTest extends TestCase
                 'destination' => ['recipient@example.com'],
                 'timestamp' => '2025-01-01T10:00:00.000Z',
                 'commonHeaders' => [
-                    'subject' => 'Test Email Subject'
-                ]
+                    'subject' => 'Test Email Subject',
+                ],
             ],
             'delivery' => [
                 'timestamp' => '2025-01-01T10:01:00.000Z',
-                'recipients' => ['recipient@example.com']
-            ]
+                'recipients' => ['recipient@example.com'],
+            ],
         ]);
 
         $response = $this->postJson('/webhook/test-token-123', $deliveryPayload);
@@ -117,12 +117,12 @@ class WebhookProcessingTest extends TestCase
         // Verify recipient status was updated
         $this->assertDatabaseHas('email_recipients', [
             'address' => 'recipient@example.com',
-            'status' => 'delivered'
+            'status' => 'delivered',
         ]);
 
         // Verify event was recorded
         $this->assertDatabaseHas('recipient_events', [
-            'type' => 'delivery'
+            'type' => 'delivery',
         ]);
     }
 
@@ -136,13 +136,13 @@ class WebhookProcessingTest extends TestCase
                 'destination' => ['bounced@example.com'],
                 'timestamp' => '2025-01-01T10:00:00.000Z',
                 'commonHeaders' => [
-                    'subject' => 'Test Email Subject'
-                ]
+                    'subject' => 'Test Email Subject',
+                ],
             ],
             'bounce' => [
                 'timestamp' => '2025-01-01T10:02:00.000Z',
-                'bounceType' => 'Permanent'
-            ]
+                'bounceType' => 'Permanent',
+            ],
         ]);
 
         $response = $this->postJson('/webhook/test-token-123', $bouncePayload);
@@ -152,12 +152,12 @@ class WebhookProcessingTest extends TestCase
         // Verify recipient status was updated
         $this->assertDatabaseHas('email_recipients', [
             'address' => 'bounced@example.com',
-            'status' => 'bounced'
+            'status' => 'bounced',
         ]);
 
         // Verify event was recorded
         $this->assertDatabaseHas('recipient_events', [
-            'type' => 'bounce'
+            'type' => 'bounce',
         ]);
     }
 
@@ -171,13 +171,13 @@ class WebhookProcessingTest extends TestCase
                 'destination' => ['complainer@example.com'],
                 'timestamp' => '2025-01-01T10:00:00.000Z',
                 'commonHeaders' => [
-                    'subject' => 'Test Email Subject'
-                ]
+                    'subject' => 'Test Email Subject',
+                ],
             ],
             'complaint' => [
                 'timestamp' => '2025-01-01T10:03:00.000Z',
-                'complaintFeedbackType' => 'abuse'
-            ]
+                'complaintFeedbackType' => 'abuse',
+            ],
         ]);
 
         $response = $this->postJson('/webhook/test-token-123', $complaintPayload);
@@ -187,13 +187,106 @@ class WebhookProcessingTest extends TestCase
         // Verify recipient status was updated
         $this->assertDatabaseHas('email_recipients', [
             'address' => 'complainer@example.com',
-            'status' => 'complained'
+            'status' => 'complained',
         ]);
 
         // Verify event was recorded
         $this->assertDatabaseHas('recipient_events', [
-            'type' => 'complaint'
+            'type' => 'complaint',
         ]);
+    }
+
+    /** @test */
+    public function webhook_processes_subscription_events()
+    {
+        $inner = [
+            'mail' => [
+                'messageId' => 'sub-msg-456',
+                'source' => 'sender@example.com',
+                'destination' => ['unsubscriber@example.com'],
+                'timestamp' => '2022-01-12T01:00:14.340Z',
+                'commonHeaders' => [
+                    'subject' => 'Monthly newsletter',
+                ],
+            ],
+            'subscription' => [
+                'contactList' => 'ContactListName',
+                'timestamp' => '2022-01-12T01:00:17.910Z',
+                'source' => 'UnsubscribeHeader',
+                'newTopicPreferences' => [
+                    'unsubscribeAll' => true,
+                    'topicSubscriptionStatus' => [
+                        ['topicName' => 'ExampleTopicName', 'subscriptionStatus' => 'OptOut'],
+                    ],
+                ],
+            ],
+        ];
+        $payload = $this->createSesNotification('Subscription', $inner, 'sns-subscription-1');
+
+        $response = $this->postJson('/webhook/test-token-123', $payload);
+
+        $response->assertOk();
+
+        $this->assertDatabaseHas('email_recipients', [
+            'address' => 'unsubscriber@example.com',
+        ]);
+        $this->assertDatabaseHas('recipient_events', [
+            'type' => 'subscription',
+        ]);
+    }
+
+    /** @test */
+    public function webhook_subscription_events_use_subscription_endpoints_when_present()
+    {
+        $inner = [
+            'mail' => [
+                'messageId' => 'sub-msg-endpoints',
+                'source' => 'sender@example.com',
+                'destination' => [],
+                'timestamp' => '2022-01-12T01:00:14.340Z',
+                'commonHeaders' => [
+                    'subject' => 'Test',
+                ],
+            ],
+            'subscription' => [
+                'timestamp' => '2022-01-12T01:00:17.910Z',
+                'endpoints' => [
+                    ['emailAddress' => 'endpoint-user@example.com'],
+                ],
+            ],
+        ];
+        $payload = $this->createSesNotification('Subscription', $inner, 'sns-sub-endpoints');
+
+        $response = $this->postJson('/webhook/test-token-123', $payload);
+
+        $response->assertOk();
+        $this->assertDatabaseHas('email_recipients', [
+            'address' => 'endpoint-user@example.com',
+        ]);
+        $this->assertEquals(1, RecipientEvent::where('type', 'subscription')->count());
+    }
+
+    /** @test */
+    public function webhook_duplicate_subscription_notifications_are_idempotent()
+    {
+        $inner = [
+            'mail' => [
+                'messageId' => 'sub-msg-dedupe',
+                'source' => 'sender@example.com',
+                'destination' => ['same@example.com'],
+                'timestamp' => '2022-01-12T01:00:14.340Z',
+                'commonHeaders' => ['subject' => 'Hi'],
+            ],
+            'subscription' => [
+                'timestamp' => '2022-01-12T01:00:17.910Z',
+            ],
+        ];
+        $payload = $this->createSesNotification('Subscription', $inner, 'sns-sub-fixed-id');
+
+        $this->postJson('/webhook/test-token-123', $payload)->assertOk();
+        $this->postJson('/webhook/test-token-123', $payload)->assertOk();
+
+        $this->assertEquals(1, RecipientEvent::where('type', 'subscription')->count());
     }
 
     /** @test */
@@ -203,11 +296,11 @@ class WebhookProcessingTest extends TestCase
         $email = Email::factory()->create([
             'project_id' => $this->project->id,
             'message_id' => 'open-message-123',
-            'opens' => 0
+            'opens' => 0,
         ]);
         $recipient = EmailRecipient::factory()->create([
             'email_id' => $email->id,
-            'address' => 'opener@example.com'
+            'address' => 'opener@example.com',
         ]);
 
         $openPayload = $this->createSesNotification('open', [
@@ -217,12 +310,12 @@ class WebhookProcessingTest extends TestCase
                 'destination' => ['opener@example.com'],
                 'timestamp' => '2025-01-01T10:00:00.000Z',
                 'commonHeaders' => [
-                    'subject' => 'Test Email Subject'
-                ]
+                    'subject' => 'Test Email Subject',
+                ],
             ],
             'open' => [
-                'timestamp' => '2025-01-01T10:04:00.000Z'
-            ]
+                'timestamp' => '2025-01-01T10:04:00.000Z',
+            ],
         ]);
 
         $response = $this->postJson('/webhook/test-token-123', $openPayload);
@@ -236,7 +329,7 @@ class WebhookProcessingTest extends TestCase
         // Verify event was recorded
         $this->assertDatabaseHas('recipient_events', [
             'type' => 'open',
-            'recipient_id' => $recipient->id
+            'recipient_id' => $recipient->id,
         ]);
     }
 
@@ -247,11 +340,11 @@ class WebhookProcessingTest extends TestCase
         $email = Email::factory()->create([
             'project_id' => $this->project->id,
             'message_id' => 'click-message-123',
-            'clicks' => 0
+            'clicks' => 0,
         ]);
         $recipient = EmailRecipient::factory()->create([
             'email_id' => $email->id,
-            'address' => 'clicker@example.com'
+            'address' => 'clicker@example.com',
         ]);
 
         $clickPayload = $this->createSesNotification('click', [
@@ -261,13 +354,13 @@ class WebhookProcessingTest extends TestCase
                 'destination' => ['clicker@example.com'],
                 'timestamp' => '2025-01-01T10:00:00.000Z',
                 'commonHeaders' => [
-                    'subject' => 'Test Email Subject'
-                ]
+                    'subject' => 'Test Email Subject',
+                ],
             ],
             'click' => [
                 'timestamp' => '2025-01-01T10:05:00.000Z',
-                'link' => 'https://example.com/link'
-            ]
+                'link' => 'https://example.com/link',
+            ],
         ]);
 
         $response = $this->postJson('/webhook/test-token-123', $clickPayload);
@@ -281,7 +374,7 @@ class WebhookProcessingTest extends TestCase
         // Verify event was recorded
         $this->assertDatabaseHas('recipient_events', [
             'type' => 'click',
-            'recipient_id' => $recipient->id
+            'recipient_id' => $recipient->id,
         ]);
     }
 
@@ -295,12 +388,12 @@ class WebhookProcessingTest extends TestCase
                 'destination' => ['rejected@example.com'],
                 'timestamp' => '2025-01-01T10:00:00.000Z',
                 'commonHeaders' => [
-                    'subject' => 'Test Email Subject'
-                ]
+                    'subject' => 'Test Email Subject',
+                ],
             ],
             'reject' => [
-                'reason' => 'Bad reputation'
-            ]
+                'reason' => 'Bad reputation',
+            ],
         ]);
 
         $response = $this->postJson('/webhook/test-token-123', $rejectPayload);
@@ -310,12 +403,12 @@ class WebhookProcessingTest extends TestCase
         // Verify recipient status was updated
         $this->assertDatabaseHas('email_recipients', [
             'address' => 'rejected@example.com',
-            'status' => 'bounced'
+            'status' => 'bounced',
         ]);
 
         // Verify event was recorded
         $this->assertDatabaseHas('recipient_events', [
-            'type' => 'reject'
+            'type' => 'reject',
         ]);
     }
 
@@ -329,13 +422,13 @@ class WebhookProcessingTest extends TestCase
                 'destination' => ['failed@example.com'],
                 'timestamp' => '2025-01-01T10:00:00.000Z',
                 'commonHeaders' => [
-                    'subject' => 'Test Email Subject'
-                ]
+                    'subject' => 'Test Email Subject',
+                ],
             ],
             'rendering_failure' => [
                 'templateName' => 'TestTemplate',
-                'errorMessage' => 'Template rendering failed'
-            ]
+                'errorMessage' => 'Template rendering failed',
+            ],
         ]);
 
         $response = $this->postJson('/webhook/test-token-123', $renderingFailurePayload);
@@ -345,12 +438,12 @@ class WebhookProcessingTest extends TestCase
         // Verify recipient status was updated
         $this->assertDatabaseHas('email_recipients', [
             'address' => 'failed@example.com',
-            'status' => 'bounced'
+            'status' => 'bounced',
         ]);
 
         // Verify event was recorded
         $this->assertDatabaseHas('recipient_events', [
-            'type' => 'rendering_failure'
+            'type' => 'rendering_failure',
         ]);
     }
 
@@ -365,16 +458,16 @@ class WebhookProcessingTest extends TestCase
                 'destination' => ['delayed@example.com'],
                 'timestamp' => '2025-01-01T10:00:00.000Z',
                 'commonHeaders' => [
-                    'subject' => 'Test Email Subject'
-                ]
+                    'subject' => 'Test Email Subject',
+                ],
             ],
             'deliveryDelay' => [
                 'timestamp' => '2025-01-01T10:05:00.000Z',
                 'delayType' => 'TransientCommunicationFailure',
                 'delayedRecipients' => [
-                    ['emailAddress' => 'delayed@example.com', 'status' => '4.4.1', 'diagnosticCode' => 'smtp; 421 4.4.1 Unable to connect']
-                ]
-            ]
+                    ['emailAddress' => 'delayed@example.com', 'status' => '4.4.1', 'diagnosticCode' => 'smtp; 421 4.4.1 Unable to connect'],
+                ],
+            ],
         ]);
 
         $response = $this->postJson('/webhook/test-token-123', $deliveryDelayPayload);
@@ -382,11 +475,11 @@ class WebhookProcessingTest extends TestCase
         $response->assertOk();
 
         $this->assertDatabaseHas('email_recipients', [
-            'address' => 'delayed@example.com'
+            'address' => 'delayed@example.com',
         ]);
 
         $this->assertDatabaseHas('recipient_events', [
-            'type' => 'delivery_delay'
+            'type' => 'delivery_delay',
         ]);
     }
 
@@ -398,8 +491,8 @@ class WebhookProcessingTest extends TestCase
                 'messageId' => 'test-message-123',
                 'source' => 'test@example.com',
                 'destination' => ['recipient@example.com'],
-                'timestamp' => '2025-01-01T10:00:00.000Z'
-            ]
+                'timestamp' => '2025-01-01T10:00:00.000Z',
+            ],
         ]);
 
         // Test with invalid token
@@ -415,8 +508,8 @@ class WebhookProcessingTest extends TestCase
                 'messageId' => 'test-message-123',
                 'source' => 'test@example.com',
                 'destination' => ['recipient@example.com'],
-                'timestamp' => '2025-01-01T10:00:00.000Z'
-            ]
+                'timestamp' => '2025-01-01T10:00:00.000Z',
+            ],
         ]);
 
         $response = $this->postJson('/webhook/nonexistent-token', $payload);
@@ -434,8 +527,8 @@ class WebhookProcessingTest extends TestCase
                 'messageId' => 'test-message-123',
                 'source' => 'test@example.com',
                 'destination' => ['recipient@example.com'],
-                'timestamp' => '2025-01-01T10:00:00.000Z'
-            ]
+                'timestamp' => '2025-01-01T10:00:00.000Z',
+            ],
         ]);
 
         $response = $this->postJson('/webhook/test-token-123', $payload);
@@ -452,9 +545,9 @@ class WebhookProcessingTest extends TestCase
                 'destination' => ['recipient@example.com'],
                 'timestamp' => '2025-01-01T12:00:00.000Z',
                 'commonHeaders' => [
-                    'subject' => 'Test Email Subject'
-                ]
-            ]
+                    'subject' => 'Test Email Subject',
+                ],
+            ],
         ]);
 
         $response = $this->postJson('/webhook/test-token-123', $payload);
@@ -466,12 +559,12 @@ class WebhookProcessingTest extends TestCase
             'project_id' => $this->project->id,
             'message_id' => 'create-test-123',
             'source' => 'sender@example.com',
-            'subject' => 'Test Email Subject'
+            'subject' => 'Test Email Subject',
         ]);
 
         // Verify recipient
         $this->assertDatabaseHas('email_recipients', [
-            'address' => 'recipient@example.com'
+            'address' => 'recipient@example.com',
         ]);
     }
 
@@ -486,9 +579,9 @@ class WebhookProcessingTest extends TestCase
                 'destination' => ['recipient1@example.com'],
                 'timestamp' => '2025-01-01T12:00:00.000Z',
                 'commonHeaders' => [
-                    'subject' => 'Multi-recipient Test Email'
-                ]
-            ]
+                    'subject' => 'Multi-recipient Test Email',
+                ],
+            ],
         ]);
 
         $payload2 = $this->createSesNotification('delivery', [
@@ -498,13 +591,13 @@ class WebhookProcessingTest extends TestCase
                 'destination' => ['recipient2@example.com'],
                 'timestamp' => '2025-01-01T12:00:00.000Z',
                 'commonHeaders' => [
-                    'subject' => 'Multi-recipient Test Email'
-                ]
+                    'subject' => 'Multi-recipient Test Email',
+                ],
             ],
             'delivery' => [
                 'timestamp' => '2025-01-01T12:01:00.000Z',
-                'recipients' => ['recipient2@example.com']
-            ]
+                'recipients' => ['recipient2@example.com'],
+            ],
         ]);
 
         $this->postJson('/webhook/test-token-123', $payload1);
@@ -515,10 +608,10 @@ class WebhookProcessingTest extends TestCase
 
         // Verify multiple recipients
         $this->assertDatabaseHas('email_recipients', [
-            'address' => 'recipient1@example.com'
+            'address' => 'recipient1@example.com',
         ]);
         $this->assertDatabaseHas('email_recipients', [
-            'address' => 'recipient2@example.com'
+            'address' => 'recipient2@example.com',
         ]);
     }
 
@@ -547,8 +640,8 @@ class WebhookProcessingTest extends TestCase
                 'messageId' => 'some-email-123',
                 'source' => 'test@example.com',
                 'destination' => ['recipient@example.com'],
-                'timestamp' => '2025-01-01T10:00:00.000Z'
-            ]
+                'timestamp' => '2025-01-01T10:00:00.000Z',
+            ],
         ], $messageId);
 
         $response = $this->postJson('/webhook/test-token-123', $payload);
@@ -576,11 +669,11 @@ class WebhookProcessingTest extends TestCase
             'project_id' => $this->project->id,
             'message_id' => 'counter-test-123',
             'opens' => 5,
-            'clicks' => 3
+            'clicks' => 3,
         ]);
         $recipient = EmailRecipient::factory()->create([
             'email_id' => $email->id,
-            'address' => 'counter@example.com'
+            'address' => 'counter@example.com',
         ]);
 
         // Test open increment
@@ -589,15 +682,15 @@ class WebhookProcessingTest extends TestCase
                 'messageId' => 'counter-test-123',
                 'source' => 'test@example.com',
                 'destination' => ['counter@example.com'],
-                'timestamp' => '2025-01-01T10:00:00.000Z'
+                'timestamp' => '2025-01-01T10:00:00.000Z',
             ],
             'open' => [
-                'timestamp' => '2025-01-01T10:04:00.000Z'
-            ]
+                'timestamp' => '2025-01-01T10:04:00.000Z',
+            ],
         ]);
 
         $this->postJson('/webhook/test-token-123', $openPayload);
-        
+
         $email->refresh();
         $this->assertEquals(6, $email->opens);
         $this->assertEquals(3, $email->clicks);
@@ -608,31 +701,31 @@ class WebhookProcessingTest extends TestCase
                 'messageId' => 'counter-test-123',
                 'source' => 'test@example.com',
                 'destination' => ['counter@example.com'],
-                'timestamp' => '2025-01-01T10:00:00.000Z'
+                'timestamp' => '2025-01-01T10:00:00.000Z',
             ],
             'click' => [
                 'timestamp' => '2025-01-01T10:05:00.000Z',
-                'link' => 'https://example.com'
-            ]
+                'link' => 'https://example.com',
+            ],
         ], 'different-sns-message-id');
 
         $this->postJson('/webhook/test-token-123', $clickPayload);
-        
+
         $email->refresh();
         $this->assertEquals(6, $email->opens);
         $this->assertEquals(4, $email->clicks);
     }
 
-    private function createSesNotification(string $eventType, array $sesData, string $messageId = null): array
+    private function createSesNotification(string $eventType, array $sesData, ?string $messageId = null): array
     {
-        $messageId = $messageId ?? 'sns-message-' . uniqid() . '-' . mt_rand(1000, 9999);
-        
+        $messageId = $messageId ?? 'sns-message-'.uniqid().'-'.mt_rand(1000, 9999);
+
         return [
             'Type' => 'Notification',
             'MessageId' => $messageId,
             'Message' => json_encode(array_merge([
-                'eventType' => $eventType
-            ], $sesData))
+                'eventType' => $eventType,
+            ], $sesData)),
         ];
     }
 }

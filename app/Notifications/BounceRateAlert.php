@@ -20,7 +20,8 @@ class BounceRateAlert extends Notification implements ShouldQueue
     public function __construct(
         public Project $project,
         public string $metricType,
-        public float $rate
+        public float $rate,
+        public float $threshold,
     ) {
         $this->onQueue(config('queue.default'));
     }
@@ -41,15 +42,15 @@ class BounceRateAlert extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         $metricLabel = $this->metricType === 'complaint' ? 'Complaint' : 'Bounce';
-        $threshold = $this->metricType === 'complaint' ? '0.1%' : '5%';
+        $thresholdPct = number_format($this->threshold, 2).'%';
         $dashboardUrl = route('dashboard.index');
 
         return (new MailMessage)
-            ->subject('[' . config('app.name') . '] ' . $metricLabel . ' rate alert for ' . $this->project->name)
-            ->line('The ' . strtolower($metricLabel) . ' rate for project "' . $this->project->name . '" has crossed the AWS threshold.')
-            ->line('Current rate: ' . number_format($this->rate, 2) . '% (threshold: ' . $threshold . ')')
+            ->subject('['.config('app.name').'] '.$metricLabel.' rate alert for '.$this->project->name)
+            ->line('The '.strtolower($metricLabel).' rate for project "'.$this->project->name.'" has crossed your configured alert threshold.')
+            ->line('Current rate: '.number_format($this->rate, 2).'% (threshold: '.$thresholdPct.')')
             ->action('View dashboard', $dashboardUrl)
-            ->line('High ' . strtolower($metricLabel) . ' rates can lead to AWS pausing your sending account. Please review your list quality and sending practices.');
+            ->line('High '.strtolower($metricLabel).' rates can lead to AWS pausing your sending account. Please review your list quality and sending practices.');
     }
 
     /**
@@ -63,6 +64,7 @@ class BounceRateAlert extends Notification implements ShouldQueue
             'project_id' => $this->project->id,
             'metric_type' => $this->metricType,
             'rate' => $this->rate,
+            'threshold' => $this->threshold,
         ];
     }
 }

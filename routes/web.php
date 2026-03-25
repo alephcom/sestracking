@@ -67,6 +67,7 @@ Route::group([
     Route::get('reports/recipients', [App\Http\Controllers\ReportsController::class, 'recipientsReport'])->name('reports.recipients');
     Route::get('reports/senders', [App\Http\Controllers\ReportsController::class, 'sendersReport'])->name('reports.senders');
     Route::get('reports/bounced-recipients', [App\Http\Controllers\ReportsController::class, 'bouncedRecipientsReport'])->name('reports.bounced-recipients');
+    Route::get('reports/unsubscribes', [App\Http\Controllers\ReportsController::class, 'unsubscribesReport'])->name('reports.unsubscribes');
     Route::get('send_test', [SendTestController::class, 'index'])->name('send_test');
     Route::post('send_test/send', [SendTestController::class, 'send'])->name('send_test.send');
     Route::any('edit_profile', [UserController::class, 'edit'])->name('edit_profile');

@@ -84,6 +84,11 @@
                 <i class="fas fa-exclamation-triangle me-2"></i>Bounced Recipients
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="unsubscribes-tab" data-bs-toggle="tab" data-bs-target="#unsubscribes-report" type="button" role="tab" aria-controls="unsubscribes-report" aria-selected="false">
+                <i class="fas fa-user-slash me-2"></i>Unsubscribes
+            </button>
+        </li>
     </ul>
 
     <!-- Tab Content -->
@@ -195,6 +200,33 @@
                 </div>
             </div>
         </div>
+
+        <!-- Unsubscribes Report -->
+        <div class="tab-pane fade" id="unsubscribes-report" role="tabpanel" aria-labelledby="unsubscribes-tab">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Unsubscribes</h5>
+                    <button type="button" id="export-unsubscribes" class="btn btn-sm btn-outline-primary" disabled>
+                        <i class="fas fa-download me-1"></i> Export
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="unsubscribes-loading" class="text-center py-5" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Loading unsubscribes report...</p>
+                    </div>
+                    <div id="unsubscribes-error" class="alert alert-danger" style="display: none;"></div>
+                    <div id="unsubscribes-content">
+                        <div class="text-center py-5 text-muted">
+                            <i class="fas fa-user-slash fa-3x mb-3"></i>
+                            <p>Select filters and click "Generate Reports" to view unsubscribes</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 @else
     <div class="card">
@@ -226,6 +258,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let recipientsData = [];
     let sendersData = [];
     let bouncedData = [];
+    let unsubscribesData = [];
 
     // Project selector handler
     if (projectSelector) {
@@ -271,6 +304,7 @@ document.addEventListener('DOMContentLoaded', function() {
         loadRecipientsReport();
         loadSendersReport();
         loadBouncedRecipientsReport();
+        loadUnsubscribesReport();
     }
 
     // Load emails report
@@ -337,6 +371,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <th>Recipients</th>
                             <th>Opens</th>
                             <th>Clicks</th>
+                            <th>Unsubscribes</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -355,6 +390,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td><span class="badge bg-info">${email.recipient_count || 0}</span></td>
                     <td><span class="badge bg-success">${email.opens || 0}</span></td>
                     <td><span class="badge bg-warning">${email.clicks || 0}</span></td>
+                    <td><span class="badge bg-secondary">${email.unsubscribes || 0}</span></td>
                 </tr>
             `;
         });
@@ -430,6 +466,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <th>Total Emails</th>
                             <th>Total Opens</th>
                             <th>Total Clicks</th>
+                            <th>Unsubscribes</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -442,6 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td><span class="badge bg-primary">${recipient.total_emails || 0}</span></td>
                     <td><span class="badge bg-success">${recipient.total_opens || 0}</span></td>
                     <td><span class="badge bg-warning">${recipient.total_clicks || 0}</span></td>
+                    <td><span class="badge bg-secondary">${recipient.total_unsubscribes || 0}</span></td>
                 </tr>
             `;
         });
@@ -652,6 +690,98 @@ document.addEventListener('DOMContentLoaded', function() {
         contentEl.innerHTML = html;
     }
 
+    // Load unsubscribes report
+    function loadUnsubscribesReport() {
+        const dateFrom = dateFromInput.value;
+        const dateTo = dateToInput.value;
+        const loadingEl = document.getElementById('unsubscribes-loading');
+        const errorEl = document.getElementById('unsubscribes-error');
+        const contentEl = document.getElementById('unsubscribes-content');
+        const exportBtn = document.getElementById('export-unsubscribes');
+
+        if (!loadingEl || !errorEl || !contentEl || !exportBtn) return;
+
+        loadingEl.style.display = 'block';
+        errorEl.style.display = 'none';
+        contentEl.innerHTML = '';
+
+        fetch(`{{ route('reports.unsubscribes') }}?projectId=${encodeURIComponent(currentProjectIds)}&dateFrom=${encodeURIComponent(dateFrom)}&dateTo=${encodeURIComponent(dateTo)}`)
+            .then(response => response.json())
+            .then(data => {
+                loadingEl.style.display = 'none';
+
+                if (data.error) {
+                    errorEl.textContent = data.error;
+                    errorEl.style.display = 'block';
+                    exportBtn.disabled = true;
+                    return;
+                }
+
+                unsubscribesData = data.data || [];
+                displayUnsubscribesReport(unsubscribesData);
+                exportBtn.disabled = false;
+            })
+            .catch(error => {
+                loadingEl.style.display = 'none';
+                errorEl.textContent = 'Error loading unsubscribes report: ' + error.message;
+                errorEl.style.display = 'block';
+                exportBtn.disabled = true;
+                console.error('Unsubscribes report error:', error);
+            });
+    }
+
+    function displayUnsubscribesReport(data) {
+        const contentEl = document.getElementById('unsubscribes-content');
+        if (!contentEl) return;
+
+        if (data.length === 0) {
+            contentEl.innerHTML = '<div class="text-center py-5 text-muted">No unsubscribe events found for the selected filters.</div>';
+            return;
+        }
+
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Recipient</th>
+                            <th>Unsubscribed At</th>
+                            <th>Subject</th>
+                            <th>From</th>
+                            <th>Project</th>
+                            <th>Contact list</th>
+                            <th>Subscription source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        data.forEach(row => {
+            html += `
+                <tr>
+                    <td>${escapeHtml(row.recipient_address || '')}</td>
+                    <td>${row.unsubscribed_at || ''}</td>
+                    <td>${escapeHtml(row.email_subject || '')}</td>
+                    <td>${escapeHtml(row.email_source || '')}</td>
+                    <td>${escapeHtml(row.project_name || '')}</td>
+                    <td>${escapeHtml(row.contact_list || '')}</td>
+                    <td><span class="badge bg-secondary">${escapeHtml(row.subscription_source || '')}</span></td>
+                </tr>
+            `;
+        });
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-3 text-muted small">
+                <strong>Total:</strong> ${data.length} unsubscribe event(s)
+            </div>
+        `;
+
+        contentEl.innerHTML = html;
+    }
+
     // Helper functions
     function getStatusBadge(status) {
         const badges = {
@@ -675,12 +805,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const exportRecipientsBtn = document.getElementById('export-recipients');
     const exportSendersBtn = document.getElementById('export-senders');
     const exportBouncedBtn = document.getElementById('export-bounced');
+    const exportUnsubscribesBtn = document.getElementById('export-unsubscribes');
 
     if (exportEmailsBtn) {
         exportEmailsBtn.addEventListener('click', function() {
             if (emailsData.length === 0) return;
             exportToCSV(emailsData, 'emails-report.csv', [
-                'ID', 'Project', 'Subject', 'From', 'Sent At', 'Status', 'Recipients', 'Opens', 'Clicks'
+                'ID', 'Project', 'Subject', 'From', 'Sent At', 'Status', 'Recipients', 'Opens', 'Clicks', 'Unsubscribes'
             ]);
         });
     }
@@ -689,7 +820,7 @@ document.addEventListener('DOMContentLoaded', function() {
         exportRecipientsBtn.addEventListener('click', function() {
             if (recipientsData.length === 0) return;
             exportToCSV(recipientsData, 'recipients-report.csv', [
-                'Email Address', 'Total Emails', 'Total Opens', 'Total Clicks'
+                'Email Address', 'Total Emails', 'Total Opens', 'Total Clicks', 'Total unsubscribes'
             ]);
         });
     }
@@ -712,6 +843,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    if (exportUnsubscribesBtn) {
+        exportUnsubscribesBtn.addEventListener('click', function() {
+            if (unsubscribesData.length === 0) return;
+            exportToCSV(unsubscribesData, 'unsubscribes-report.csv', [
+                'Recipient Email', 'Unsubscribed At', 'Email Subject', 'Email From', 'Project', 'Contact list', 'Subscription source'
+            ]);
+        });
+    }
+
     function exportToCSV(data, filename, headers) {
         // Map headers to data keys
         const headerMap = {
@@ -724,10 +864,12 @@ document.addEventListener('DOMContentLoaded', function() {
             'Recipients': 'recipient_count',
             'Opens': 'opens',
             'Clicks': 'clicks',
+            'Unsubscribes': 'unsubscribes',
             'Email Address': 'address',
             'Total Emails': 'total_emails',
             'Total Opens': 'total_opens',
             'Total Clicks': 'total_clicks',
+            'Total unsubscribes': 'total_unsubscribes',
             'Sender': 'sender',
             'Delivered': 'status_delivered',
             'Sent': 'status_sent',
@@ -740,6 +882,9 @@ document.addEventListener('DOMContentLoaded', function() {
             'Bounced At': 'bounced_at',
             'Email Subject': 'email_subject',
             'Email From': 'email_source',
+            'Unsubscribed At': 'unsubscribed_at',
+            'Contact list': 'contact_list',
+            'Subscription source': 'subscription_source',
         };
         
         let csv = headers.join(',') + '\n';
