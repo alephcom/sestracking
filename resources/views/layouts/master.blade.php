@@ -149,7 +149,7 @@
       <footer class="footer mt-auto py-4 text-muted">
         <div class="d-flex justify-content-between align-items-center">
           <div>
-            © {{ now()->year }} <a href="https://sesdashboard.com/" target="_blank">SES Tracking</a>
+            © {{ now()->year }} <a href="https://sestracking.com/" target="_blank">SES Tracking</a>
           </div>
           <div class="text-muted small">
             <i class="fas fa-heart text-danger"></i> Built with modern design

@@ -1,29 +1,46 @@
-# SES Dashboard
+# SES Tracking — Self-hosted AWS SES email analytics dashboard
 
-A Laravel-based dashboard application for tracking AWS SES email analytics and events. Monitor email delivery, bounces, complaints, opens, and clicks with multi-user and multi-project support.
+**SES Tracking** is a self-hosted **[Amazon SES](https://aws.amazon.com/ses/)** (Simple Email Service) analytics application built with **Laravel**. It ingests **SES event notifications** through **Amazon SNS** webhooks and turns them into dashboards, reports, and exports so you can monitor **email delivery**, **bounces**, **complaints**, **opens**, **clicks**, and related metrics across **teams and projects**.
 
-The idea and main structure is taken from the [SES Dashboard](https://github.com/Nikeev/sesdashboard) MIT Copyright (c) 2020 Nikeev, but this project is completely different. It uses Laravel, has unit tests, offers multi-user support and multi-project management, has built-in webhook payload logging, which can be turned on and off, and tracks and logs SES events correctly for tricky cases (like open/click events for single email sent to multiple recipients).
+**Website:** [sestracking.com](https://sestracking.com/)
 
+## Who it is for
 
+- Teams sending mail through **AWS SES** who want **private**, **self-hosted** visibility into the full event stream—not only sends, but **per-recipient** outcomes.
+- Operators who need **multi-project** isolation (separate webhook URLs and access) and **multi-user** admin vs regular roles.
+- Anyone migrating from or comparing to **[sesdashboard](https://github.com/Nikeev/sesdashboard)** and wanting a Laravel 11 stack, tests, optional **webhook payload logging**, and robust handling of edge cases (for example **open and click** attribution when one message has **multiple recipients**).
 
+This project takes structural inspiration from [SES Dashboard](https://github.com/Nikeev/sesdashboard) (MIT, Copyright (c) 2020 Nikeev) but is maintained separately: different codebase, **Laravel 11**, automated tests, **built-in debug logging** for webhooks (toggle via env), **multi-user** and **multi-project** support, and corrected SES event handling for tricky real-world cases.
+
+**License:** [MIT](LICENSE)
+
+**Suggested GitHub topics:** `aws-ses`, `amazon-ses`, `sns`, `email-tracking`, `email-analytics`, `webhooks`, `laravel`, `php`, `self-hosted`, `transactional-email`, `dashboard`
 
 ## Features
 
-- **Multi-user Support:** Admin and regular user roles
-- **Multi-project Management:** Organize emails by projects
-- **Email Tracking:** Monitor delivery, bounces, complaints, opens, clicks
-- **AWS SES Integration:** Webhook processing for real-time events
-- **Analytics Dashboard:** Charts and statistics with filters
-- **Data Export:** CSV and Excel export capabilities with filters
-- **Responsive UI:** Vue.js frontend with Bootstrap
+- **Multi-user support:** Administrator and regular user roles
+- **Multi-project management:** Dedicated **webhook endpoints** per project (`/webhook/{project_token}`)
+- **Email event tracking:** Delivery, bounces, complaints, opens, clicks, delays (as surfaced by SES/SNS)
+- **AWS integration:** **SNS → HTTPS** webhook processing with **idempotent** handling
+- **Analytics dashboard:** **Chart.js** charts, filters by project and date range
+- **Data export:** **CSV** and **Excel** with filters
+- **Responsive UI:** **Bootstrap 5** frontend (including **Vue** components where used), compiled assets included in the repo
+
+## Screenshots
+
+### Dashboard
+
+Overview of send, delivery, opens, clicks, and not-delivered metrics with project and date filters, plus a multi-series trend chart (send, delivery, bounce, complaint, delivery delay, open, click).
+
+![SES Tracking dashboard: AWS SES email analytics summary cards and Chart.js activity trends](docs/screenshots/dashboard.png)
 
 ## Architecture
 
-- **Backend:** Laravel 11 with MySQL
-- **Frontend:** Vanilla JavaScript with Bootstrap 5 and Chart.js
-- **Build Tool:** Laravel Mix
-- **Email Service:** AWS SES
-- **Webhook Processing:** SNS integration with idempotency
+- **Backend:** Laravel 11, PHP 8.2+, MySQL 8
+- **Frontend:** JavaScript with Bootstrap 5, Chart.js, and Vue (see `package.json` / Mix build for UI components)
+- **Build:** Laravel Mix
+- **Email provider:** Amazon SES
+- **Ingest:** Amazon SNS notifications → Laravel webhook controllers (idempotent processing)
 
 ## Project Kickstart
 
@@ -32,19 +49,19 @@ The idea and main structure is taken from the [SES Dashboard](https://github.com
 - PHP 8.2+
 - MySQL 8.0+
 - Composer
-- **Optional:** Node.js 18+ and npm/yarn (only needed if you want to modify or rebuild frontend assets)
+- **Optional:** Node.js 18+ and npm/yarn (only if you change frontend sources and rebuild assets)
 
-> **Note:** The compiled frontend assets are included in the repository, so you don't need Node.js to run the application. You only need it if you want to modify Vue components, styles, or rebuild the assets.
+> **Note:** Compiled frontend assets are committed, so you do **not** need Node.js to run the app—only to develop or rebuild the asset bundle.
 
 ### Quick Start
 
 1. **Clone and install dependencies:**
    ```bash
-   git clone <repository-url>
-   cd <repository-name>
+   git clone https://github.com/alephcom/sestracking.git
+   cd sestracking
    composer install
    ```
-   > No need to run `npm install` - compiled assets are already included!
+   > No need to run `npm install` unless you are working on the frontend build.
 
 2. **Environment configuration:**
    ```bash
@@ -86,7 +103,7 @@ If you want to modify Vue components, styles, or rebuild frontend assets:
    ```bash
    npm run prod
    ```
-   
+
 ## Initial Data & Admin User
 
 The database seeder creates an initial admin user:
@@ -124,7 +141,7 @@ MAIL_FROM_NAME="${APP_NAME}"
 
 ### Application Settings
 ```env
-APP_NAME="SES Dashboard"
+APP_NAME="SES Tracking"
 APP_ENV=local
 APP_DEBUG=true
 APP_URL=http://localhost:8000
@@ -160,13 +177,16 @@ SSO-only users are rejected by that command (they do not use in-app TOTP).
 
 ## Webhook Setup
 
-Configure your AWS SES to send notifications to:
+Point **Amazon SES event publishing** at an **Amazon SNS** topic, then subscribe your app’s HTTPS endpoint to that topic. Each project exposes a unique path used as the **SNS HTTPS subscription URL** (confirm the subscription in SNS when prompted).
+
+Configure **configuration sets** and event types (send, delivery, bounce, complaint, open, click, etc.) in the **SES console** so SES publishes notifications to SNS; SNS delivers JSON payloads to:
+
 ```
 POST https://<your-domain.com>/webhook/{project_token}
 ```
 
 Each project has a unique token for webhook authentication.
 
-
 ## TODO
+
 - [ ] Add more detailed documentation for setting up AWS SES and SNS
