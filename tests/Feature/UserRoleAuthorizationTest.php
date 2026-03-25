@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use App\Models\Project;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -14,8 +13,8 @@ class UserRoleAuthorizationTest extends TestCase
     /** @test */
     public function admin_access_to_admin_only_routes()
     {
-        $admin = User::factory()->create(['super_admin' => true]);
-        
+        $admin = User::factory()->withTwoFactorEnrolled()->create(['super_admin' => true]);
+
         $this->actingAs($admin);
 
         // Test admin routes access
@@ -29,8 +28,8 @@ class UserRoleAuthorizationTest extends TestCase
     /** @test */
     public function regular_user_blocked_from_admin_routes()
     {
-        $user = User::factory()->create(['super_admin' => false]);
-        
+        $user = User::factory()->withTwoFactorEnrolled()->create(['super_admin' => false]);
+
         $this->actingAs($user);
 
         // Test admin routes are blocked
@@ -69,8 +68,8 @@ class UserRoleAuthorizationTest extends TestCase
     /** @test */
     public function user_accessing_their_own_profile()
     {
-        $user = User::factory()->create(['super_admin' => false]);
-        
+        $user = User::factory()->withTwoFactorEnrolled()->create(['super_admin' => false]);
+
         $this->actingAs($user);
 
         $response = $this->get('/edit_profile');
@@ -80,8 +79,8 @@ class UserRoleAuthorizationTest extends TestCase
     /** @test */
     public function authenticated_users_can_access_general_routes()
     {
-        $user = User::factory()->create(['super_admin' => false]);
-        
+        $user = User::factory()->withTwoFactorEnrolled()->create(['super_admin' => false]);
+
         $this->actingAs($user);
 
         // Test general authenticated routes
@@ -101,8 +100,8 @@ class UserRoleAuthorizationTest extends TestCase
     /** @test */
     public function admin_users_can_access_all_routes()
     {
-        $admin = User::factory()->create(['super_admin' => true]);
-        
+        $admin = User::factory()->withTwoFactorEnrolled()->create(['super_admin' => true]);
+
         $this->actingAs($admin);
 
         // Test admin can access general routes

@@ -12,13 +12,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        
+
         $middleware->validateCsrfTokens(except: [
-            'webhook/*'
+            'webhook/*',
         ]);
 
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            'two-factor.enrolled' => \App\Http\Middleware\EnsureTwoFactorIsEnrolled::class,
         ]);
 
     })

@@ -18,37 +18,42 @@ class LoginLogoutTest extends TestCase
     /** @test */
     public function login_with_valid_admin_credentials()
     {
-        $user = User::factory()->create([
+        $user = User::factory()->withTwoFactorEnrolled()->create([
             'email' => 'test-admin@example.com',
             'password' => bcrypt('password'),
-            'super_admin' => true
+            'super_admin' => true,
         ]);
 
-        $response = $this->post('/login', [
+        $this->post('/login', [
             'email' => 'test-admin@example.com',
-            'password' => 'password'
+            'password' => 'password',
         ]);
 
-        $response->assertRedirect('/dashboard');
-        $this->assertAuthenticatedAs($user);
+        $this->assertGuest();
+        $this->submitTwoFactorChallenge($user);
+
+        $this->assertAuthenticatedAs($user->fresh());
+        $this->get(route('dashboard.index'))->assertOk();
     }
 
     /** @test */
     public function login_with_valid_regular_user_credentials()
     {
-        $user = User::factory()->create([
+        $user = User::factory()->withTwoFactorEnrolled()->create([
             'email' => 'test-user@example.com',
             'password' => bcrypt('password'),
-            'super_admin' => false
+            'super_admin' => false,
         ]);
 
-        $response = $this->post('/login', [
+        $this->post('/login', [
             'email' => 'test-user@example.com',
-            'password' => 'password'
+            'password' => 'password',
         ]);
 
-        $response->assertRedirect('/dashboard');
-        $this->assertAuthenticatedAs($user);
+        $this->assertGuest();
+        $this->submitTwoFactorChallenge($user);
+
+        $this->assertAuthenticatedAs($user->fresh());
     }
 
     /** @test */
@@ -57,7 +62,7 @@ class LoginLogoutTest extends TestCase
         $response = $this->post('/login', [
             'email' => 'nonexistent@example.com',
             'password' => 'password',
-            'submit' => true
+            'submit' => true,
         ]);
 
         $response->assertViewIs('auth.login');
@@ -70,13 +75,13 @@ class LoginLogoutTest extends TestCase
     {
         User::factory()->create([
             'email' => 'test-admin2@example.com',
-            'password' => bcrypt('password')
+            'password' => bcrypt('password'),
         ]);
 
         $response = $this->post('/login', [
             'email' => 'test-admin2@example.com',
             'password' => 'wrongpassword',
-            'submit' => true
+            'submit' => true,
         ]);
 
         $response->assertViewIs('auth.login');
@@ -90,7 +95,7 @@ class LoginLogoutTest extends TestCase
         $response = $this->post('/login', [
             'email' => '',
             'password' => '',
-            'submit' => true
+            'submit' => true,
         ]);
 
         $response->assertViewIs('auth.login');
@@ -102,7 +107,7 @@ class LoginLogoutTest extends TestCase
     public function logout_functionality()
     {
         $user = User::factory()->create();
-        
+
         $this->actingAs($user);
         $this->assertAuthenticated();
 
@@ -117,17 +122,16 @@ class LoginLogoutTest extends TestCase
     {
         $user = User::factory()->create([
             'email' => 'test-admin3@example.com',
-            'password' => bcrypt('password')
+            'password' => bcrypt('password'),
         ]);
 
         $this->post('/login', [
             'email' => 'test-admin3@example.com',
-            'password' => 'password'
+            'password' => 'password',
         ]);
 
         $this->assertAuthenticated();
-        
-        // Make another request to verify session persists
+
         $response = $this->get('/');
         $response->assertOk();
         $this->assertAuthenticated();
@@ -136,29 +140,28 @@ class LoginLogoutTest extends TestCase
     /** @test */
     public function redirect_to_intended_page_after_login()
     {
-        $user = User::factory()->create([
+        $user = User::factory()->withTwoFactorEnrolled()->create([
             'email' => 'test-admin4@example.com',
-            'password' => bcrypt('password')
+            'password' => bcrypt('password'),
         ]);
 
-        // Try to access protected page while unauthenticated
         $this->get('/activity');
-        
-        // Login
-        $response = $this->post('/login', [
+
+        $this->post('/login', [
             'email' => 'test-admin4@example.com',
-            'password' => 'password'
+            'password' => 'password',
         ]);
 
-        // Should redirect to intended page (activity) or default (/)
-        $response->assertRedirect('/activity');
+        $this->submitTwoFactorChallenge($user);
+
+        $this->get('/activity')->assertOk();
     }
 
     /** @test */
     public function unauthenticated_user_redirected_to_login()
     {
         $response = $this->get('/activity');
-        
+
         $response->assertRedirect('/login');
         $this->assertGuest();
     }

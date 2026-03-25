@@ -40,6 +40,8 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     /**
@@ -53,7 +55,29 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'super_admin' => 'boolean',
+            'two_factor_secret' => 'encrypted',
+            'two_factor_confirmed_at' => 'datetime',
+            'two_factor_recovery_codes' => 'array',
         ];
+    }
+
+    /**
+     * Local / invitation users must use in-app TOTP; SSO users (provider set) do not.
+     */
+    public function requiresInAppTwoFactor(): bool
+    {
+        return $this->provider === null;
+    }
+
+    public function hasConfirmedTwoFactor(): bool
+    {
+        return $this->two_factor_confirmed_at !== null
+            && filled($this->two_factor_secret);
+    }
+
+    public function needsTwoFactorEnrollment(): bool
+    {
+        return $this->requiresInAppTwoFactor() && ! $this->hasConfirmedTwoFactor();
     }
 
     /**

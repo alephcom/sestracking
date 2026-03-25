@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Tests\TestCase;
@@ -101,5 +102,54 @@ class PasswordResetTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors('email');
+    }
+
+    public function test_forgot_password_logs_link_request_with_outcome(): void
+    {
+        Notification::fake();
+        Log::spy();
+
+        User::create([
+            'name' => 'Test User',
+            'email' => 'logged@example.com',
+            'password' => Hash::make('old-password-9'),
+            'super_admin' => false,
+        ]);
+
+        $this->post('/forgot-password', [
+            'email' => 'logged@example.com',
+        ]);
+
+        Log::shouldHaveReceived('log')->withArgs(function (string $level, string $message, array $context) {
+            return $level === 'info'
+                && $message === 'Password reset link requested.'
+                && ($context['outcome'] ?? null) === 'reset_link_sent'
+                && ($context['email'] ?? null) === 'logged@example.com';
+        });
+    }
+
+    public function test_reset_password_failure_is_logged(): void
+    {
+        Log::spy();
+
+        User::create([
+            'name' => 'Test User',
+            'email' => 'reset-log@example.com',
+            'password' => Hash::make('old-password-9'),
+            'super_admin' => false,
+        ]);
+
+        $this->post('/reset-password', [
+            'token' => 'invalid-token',
+            'email' => 'reset-log@example.com',
+            'password' => 'new-secure-pass-9',
+            'password_confirmation' => 'new-secure-pass-9',
+        ]);
+
+        Log::shouldHaveReceived('warning')->withArgs(function (string $message, array $context) {
+            return $message === 'Password reset attempt failed.'
+                && ($context['email'] ?? null) === 'reset-log@example.com'
+                && isset($context['broker_status']);
+        });
     }
 }

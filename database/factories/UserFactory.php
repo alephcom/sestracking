@@ -5,6 +5,7 @@ namespace Database\Factories;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use PragmaRX\Google2FA\Google2FA;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
@@ -40,5 +41,24 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    /**
+     * Password users only: in-app TOTP enrolled (for feature tests hitting auth + two-factor.enrolled routes).
+     */
+    public function withTwoFactorEnrolled(): static
+    {
+        return $this->afterCreating(function (\App\Models\User $user) {
+            if ($user->provider !== null) {
+                return;
+            }
+
+            $google2fa = new Google2FA;
+            $user->forceFill([
+                'two_factor_secret' => $google2fa->generateSecretKey(),
+                'two_factor_confirmed_at' => now(),
+                'two_factor_recovery_codes' => [],
+            ])->save();
+        });
     }
 }

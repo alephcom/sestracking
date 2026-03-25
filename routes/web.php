@@ -6,6 +6,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\SendTestController;
 use App\Http\Controllers\SocialAuthController;
+use App\Http\Controllers\TwoFactorAuthenticationController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -35,11 +36,27 @@ Route::get('auth/{provider}/callback', [SocialAuthController::class, 'callback']
     ->where('provider', 'google|microsoft')
     ->name('social.callback');
 
-Route::group([
-    'middleware' => ['auth'],
-], function () {
+Route::get('two-factor/challenge/cancel', [TwoFactorAuthenticationController::class, 'cancelChallenge'])
+    ->name('two-factor.challenge.cancel');
 
+Route::middleware(['throttle:12,1'])->group(function () {
+    Route::get('two-factor/challenge', [TwoFactorAuthenticationController::class, 'showChallenge'])
+        ->name('two-factor.challenge');
+    Route::post('two-factor/challenge', [TwoFactorAuthenticationController::class, 'confirmChallenge'])
+        ->name('two-factor.challenge.confirm');
+});
+
+Route::middleware(['auth'])->group(function () {
     Route::get('logout', [AuthController::class, 'logout'])->name('logout');
+    Route::get('two-factor/setup', [TwoFactorAuthenticationController::class, 'showSetup'])->name('two-factor.setup');
+    Route::post('two-factor/setup', [TwoFactorAuthenticationController::class, 'confirmSetup'])
+        ->middleware('throttle:12,1')
+        ->name('two-factor.setup.confirm');
+});
+
+Route::group([
+    'middleware' => ['auth', 'two-factor.enrolled'],
+], function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
     Route::get('dashboard/api', [DashboardController::class, 'jsApi'])->name('dashboard.api');
     Route::get('activity', [ActivityController::class, 'index'])->name('activity');
@@ -55,6 +72,9 @@ Route::group([
     Route::post('send_test/send', [SendTestController::class, 'send'])->name('send_test.send');
     Route::any('edit_profile', [UserController::class, 'edit'])->name('edit_profile');
 
+    Route::get('two-factor/recovery-codes', [TwoFactorAuthenticationController::class, 'showRecoveryCodes'])
+        ->name('two-factor.recovery-codes');
+
     // Project request routes (available to all authenticated users)
     Route::get('project-requests/create', [App\Http\Controllers\ProjectRequestController::class, 'create'])->name('project-requests.create');
     Route::post('project-requests', [App\Http\Controllers\ProjectRequestController::class, 'store'])->name('project-requests.store');
@@ -62,7 +82,7 @@ Route::group([
 });
 
 // Admin Routes
-Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'two-factor.enrolled', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::resource('projects', App\Http\Controllers\Admin\ProjectManagementController::class);
     Route::get('projects/search-users', [App\Http\Controllers\Admin\ProjectManagementController::class, 'searchUsers'])->name('projects.search-users');
     Route::resource('users', App\Http\Controllers\Admin\UserManagementController::class);
@@ -70,7 +90,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 });
 
 // Project request management routes (super admin only)
-Route::middleware(['auth'])->prefix('project-requests')->name('project-requests.')->group(function () {
+Route::middleware(['auth', 'two-factor.enrolled'])->prefix('project-requests')->name('project-requests.')->group(function () {
     Route::get('/', [App\Http\Controllers\ProjectRequestController::class, 'index'])->name('index');
     Route::get('/{projectRequest}', [App\Http\Controllers\ProjectRequestController::class, 'show'])->name('show');
     Route::post('/{projectRequest}/approve', [App\Http\Controllers\ProjectRequestController::class, 'approve'])->name('approve');

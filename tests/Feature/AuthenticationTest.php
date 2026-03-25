@@ -14,32 +14,39 @@ class AuthenticationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
-        // Create test users (super_admin for platform admin, no role column on users table)
-        User::create([
+
+        $admin = User::create([
             'id' => 1,
             'name' => 'Admin User',
             'email' => 'admin@example.com',
             'password' => Hash::make('password123'),
             'super_admin' => true,
         ]);
+        $this->enrollAppTwoFactor($admin);
 
-        User::create([
+        $user = User::create([
             'name' => 'Regular User',
             'email' => 'user@example.com',
             'password' => Hash::make('password123'),
             'super_admin' => false,
         ]);
+        $this->enrollAppTwoFactor($user);
     }
 
     public function test_login_with_valid_admin_credentials()
     {
-        $response = $this->post('/login', [
+        $this->post('/login', [
             'email' => 'admin@example.com',
             'password' => 'password123',
+            'submit' => true,
         ]);
 
-        $response->assertRedirect('/dashboard');
+        $this->assertGuest();
+        $this->assertTrue(session()->has('login.two_factor_pending_user_id'));
+
+        $admin = User::where('email', 'admin@example.com')->first();
+        $this->submitTwoFactorChallenge($admin);
+
         $this->assertAuthenticated();
         $this->assertEquals('admin@example.com', auth()->user()->email);
         $this->assertTrue(auth()->user()->isSuperAdmin());
@@ -47,12 +54,16 @@ class AuthenticationTest extends TestCase
 
     public function test_login_with_valid_regular_user_credentials()
     {
-        $response = $this->post('/login', [
+        $this->post('/login', [
             'email' => 'user@example.com',
             'password' => 'password123',
+            'submit' => true,
         ]);
 
-        $response->assertRedirect('/dashboard');
+        $this->assertGuest();
+        $user = User::where('email', 'user@example.com')->first();
+        $this->submitTwoFactorChallenge($user);
+
         $this->assertAuthenticated();
         $this->assertEquals('user@example.com', auth()->user()->email);
         $this->assertFalse(auth()->user()->isSuperAdmin());
@@ -103,7 +114,7 @@ class AuthenticationTest extends TestCase
     public function test_logout_functionality()
     {
         $user = User::where('email', 'admin@example.com')->first();
-        
+
         $this->actingAs($user);
         $this->assertAuthenticated();
 
@@ -115,14 +126,21 @@ class AuthenticationTest extends TestCase
 
     public function test_session_persistence_after_login()
     {
-        $response = $this->post('/login', [
-            'email' => 'admin@example.com',
+        User::create([
+            'name' => 'Session User',
+            'email' => 'session@example.com',
+            'password' => Hash::make('password123'),
+            'super_admin' => false,
+        ]);
+
+        $this->post('/login', [
+            'email' => 'session@example.com',
             'password' => 'password123',
+            'submit' => true,
         ]);
 
         $this->assertAuthenticated();
-        
-        // Make another request to verify session persists
+
         $dashboardResponse = $this->get('/');
         $dashboardResponse->assertOk();
         $this->assertAuthenticated();
@@ -130,17 +148,17 @@ class AuthenticationTest extends TestCase
 
     public function test_redirect_to_intended_page_after_login()
     {
-        // Try to access protected page while unauthenticated
-        $response = $this->get('/activity');
-        $response->assertRedirect('/login');
-
-        // Login and should be redirected to intended page (activity)
-        $response = $this->post('/login', [
+        $this->get('/activity');
+        $this->post('/login', [
             'email' => 'admin@example.com',
             'password' => 'password123',
+            'submit' => true,
         ]);
 
-        $response->assertRedirect('/activity');
+        $admin = User::where('email', 'admin@example.com')->first();
+        $this->submitTwoFactorChallenge($admin);
+
+        $this->get('/activity')->assertOk();
     }
 
     public function test_unauthenticated_user_redirected_to_login()
