@@ -128,7 +128,18 @@ DB_USERNAME=your_username
 DB_PASSWORD=your_password
 ```
 
-### AWS SES Configuration - used for email sending test only
+### AWS SES Configuration (send test vs suppression list)
+
+Laravel’s SES mail transport (send test) uses `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION` in `.env` as usual.
+
+**SES account-level suppression list** features (admin UI list/add/remove, webhook auto-push, and the scheduled daily import into `ses_suppressed_destinations`) use **only the per-project** Access Key ID, Secret Access Key, and region fields on each project in the admin UI. Global `.env` credentials are **not** used for those APIs.
+
+Required **IAM actions** for suppression are listed on each project’s edit page and in `config/ses_suppression.php` (`ses:PutSuppressedDestination`, `ses:ListSuppressedDestinations`, `ses:DeleteSuppressedDestination`; `ses:GetSuppressedDestination` is available on the service for future use). Use `"Resource": "*"` in the policy unless your organization scopes further. The project’s AWS region must match the region where you send with SES for that account.
+
+A queued job runs **daily** (see `routes/console.php`) to copy the account suppression list into `ses_suppressed_destinations` for **each project that has per-project SES keys and a resolvable region**. Ensure `php artisan schedule:run` is on your server crontab so the scheduler fires.
+
+If your SES account already adds recipients to the account suppression list automatically for bounces or complaints, enabling auto-push in this app can be redundant but is otherwise safe.
+
 ```env
 AWS_ACCESS_KEY_ID=your_aws_access_key
 AWS_SECRET_ACCESS_KEY=your_aws_secret_key

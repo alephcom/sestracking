@@ -7,6 +7,7 @@ use App\Models\EmailRecipient;
 use App\Models\Project;
 use App\Models\RecipientEvent;
 use App\Notifications\BounceRateAlert;
+use App\Services\SesWebhookSuppressionDispatcher;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -21,6 +22,10 @@ use function Sentry\withScope;
 
 class SesWebhookController extends Controller
 {
+    public function __construct(
+        private readonly SesWebhookSuppressionDispatcher $suppressionDispatcher
+    ) {}
+
     /**
      * Map SES eventType (PascalCase or lowercase) to stored enum value.
      */
@@ -243,7 +248,7 @@ class SesWebhookController extends Controller
                     ? Carbon::parse($ses[$payloadKey]['timestamp'])
                     : Carbon::parse($ses['mail']['timestamp'] ?? now());
 
-                RecipientEvent::firstOrCreate(
+                $recipientEvent = RecipientEvent::firstOrCreate(
                     [
                         'sns_message_id' => $messageId,
                         'recipient_id' => $recipient->id,
@@ -263,6 +268,16 @@ class SesWebhookController extends Controller
                     'complaint' => $recipient->update(['status' => 'complained']),
                     default => null,
                 };
+
+                if (in_array($type, ['bounce', 'complaint'], true)) {
+                    $this->suppressionDispatcher->dispatchIfEligible(
+                        $project,
+                        $type,
+                        $ses,
+                        $cleanAddress,
+                        $recipientEvent->wasRecentlyCreated
+                    );
+                }
             }
         }
 

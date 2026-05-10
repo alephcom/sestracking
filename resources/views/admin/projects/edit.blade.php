@@ -99,6 +99,66 @@
                 </small>
             </div>
 
+            <hr class="my-4">
+
+            <h4 class="h5 mb-3"><i class="fas fa-ban"></i> SES account suppression list</h4>
+            <p class="text-muted small">
+                <a href="{{ route('admin.projects.ses-suppression.index', $project) }}">Open suppression list</a> to view, add, or remove addresses in Amazon SES for this project&rsquo;s AWS credentials and region.
+            </p>
+
+            @include('admin.projects.partials.ses-suppression-iam-requirements')
+
+            @php
+                $oldAuto = old('ses_suppression_auto_push_enabled');
+                $checkedAuto = $oldAuto !== null ? (string) $oldAuto === '1' : $project->ses_suppression_auto_push_enabled;
+                $oldComplaints = old('ses_suppression_push_complaints');
+                $checkedComplaints = $oldComplaints !== null ? (string) $oldComplaints === '1' : $project->ses_suppression_push_complaints;
+                $oldSoft = old('ses_suppression_push_soft_bounces');
+                $checkedSoft = $oldSoft !== null ? (string) $oldSoft === '1' : $project->ses_suppression_push_soft_bounces;
+            @endphp
+            <div class="form-check mb-2 mt-3">
+                <input type="hidden" name="ses_suppression_auto_push_enabled" value="0">
+                <input type="checkbox" class="form-check-input" id="ses_suppression_auto_push_enabled" name="ses_suppression_auto_push_enabled" value="1" @checked($checkedAuto)>
+                <label class="form-check-label" for="ses_suppression_auto_push_enabled">Automatically add addresses to the SES suppression list when bounces or complaints are received (queued after each new webhook event)</label>
+            </div>
+            <div class="form-check mb-2">
+                <input type="hidden" name="ses_suppression_push_complaints" value="0">
+                <input type="checkbox" class="form-check-input" id="ses_suppression_push_complaints" name="ses_suppression_push_complaints" value="1" @checked($checkedComplaints)>
+                <label class="form-check-label" for="ses_suppression_push_complaints">Include complaints (when auto-push is enabled)</label>
+            </div>
+            <div class="form-check mb-3">
+                <input type="hidden" name="ses_suppression_push_soft_bounces" value="0">
+                <input type="checkbox" class="form-check-input" id="ses_suppression_push_soft_bounces" name="ses_suppression_push_soft_bounces" value="1" @checked($checkedSoft)>
+                <label class="form-check-label" for="ses_suppression_push_soft_bounces">Include <strong>transient</strong> bounces (default is hard bounces only: Permanent)</label>
+            </div>
+
+            <h5 class="h6 text-muted">AWS credentials for SES suppression (required for list / add / remove / auto-push)</h5>
+            <p class="small text-muted">Suppression list APIs and webhook auto-push use <strong>only</strong> these per-project keys (not <code>AWS_ACCESS_KEY_ID</code> in <code>.env</code>). Set Access Key ID, Secret Access Key, and region (or leave region blank to use <code>AWS_DEFAULT_REGION</code> / <code>services.ses.region</code> for the API endpoint only).</p>
+            <div class="form-group mb-3">
+                <label for="ses_aws_access_key_id">Access Key ID</label>
+                <input type="text" name="ses_aws_access_key_id" id="ses_aws_access_key_id" class="form-control @error('ses_aws_access_key_id') is-invalid @enderror"
+                    value="{{ old('ses_aws_access_key_id', $project->ses_aws_access_key_id) }}" autocomplete="off">
+                @error('ses_aws_access_key_id')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="form-group mb-3">
+                <label for="ses_aws_secret_access_key">Secret Access Key</label>
+                <input type="password" name="ses_aws_secret_access_key" id="ses_aws_secret_access_key" class="form-control @error('ses_aws_secret_access_key') is-invalid @enderror"
+                    value="" autocomplete="new-password" placeholder="Leave blank to keep existing secret">
+                @error('ses_aws_secret_access_key')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+            <div class="form-group mb-3">
+                <label for="ses_aws_default_region">AWS region</label>
+                <input type="text" name="ses_aws_default_region" id="ses_aws_default_region" class="form-control @error('ses_aws_default_region') is-invalid @enderror"
+                    value="{{ old('ses_aws_default_region', $project->ses_aws_default_region) }}" placeholder="e.g. us-east-1">
+                @error('ses_aws_default_region')
+                    <div class="invalid-feedback">{{ $message }}</div>
+                @enderror
+            </div>
+
             <div class="form-group">
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-save"></i> Update Project

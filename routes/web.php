@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActivityController;
+use App\Http\Controllers\Admin\ProjectSesSuppressionController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PasswordResetController;
@@ -83,8 +84,13 @@ Route::group([
 
 // Admin Routes
 Route::middleware(['auth', 'two-factor.enrolled', 'admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::resource('projects', App\Http\Controllers\Admin\ProjectManagementController::class);
     Route::get('projects/search-users', [App\Http\Controllers\Admin\ProjectManagementController::class, 'searchUsers'])->name('projects.search-users');
+    Route::middleware(['throttle:60,1'])->group(function () {
+        Route::get('projects/{project}/ses-suppression', [ProjectSesSuppressionController::class, 'index'])->name('projects.ses-suppression.index');
+        Route::post('projects/{project}/ses-suppression', [ProjectSesSuppressionController::class, 'store'])->name('projects.ses-suppression.store');
+        Route::delete('projects/{project}/ses-suppression', [ProjectSesSuppressionController::class, 'destroy'])->name('projects.ses-suppression.destroy');
+    });
+    Route::resource('projects', App\Http\Controllers\Admin\ProjectManagementController::class);
     Route::resource('users', App\Http\Controllers\Admin\UserManagementController::class);
     Route::post('users/invite', [App\Http\Controllers\Admin\UserManagementController::class, 'invite'])->name('users.invite');
 });
