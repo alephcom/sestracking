@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Support;
 
 use App\Models\Project;
+use App\Services\SesSuppressionListMirror;
 use App\Services\SesSuppressionService;
 use Aws\Exception\AwsException;
 use Illuminate\Http\Request;
@@ -14,47 +15,9 @@ final class SesSuppressionHttpHandler
     public const USER_FACING_CONFIG_ERROR = 'Per-project AWS Access Key ID, Secret Access Key, and a resolvable region are required for the suppression list (global .env keys are not used). Configure them on the project edit screen.';
 
     public function __construct(
-        private readonly SesSuppressionService $suppression
+        private readonly SesSuppressionService $suppression,
+        private readonly SesSuppressionListMirror $mirror
     ) {}
-
-    /**
-     * @return array{summaries: array<int, array<string, mixed>>, nextToken: ?string, error: ?string}
-     */
-    public function listPage(Request $request, Project $project): array
-    {
-        $summaries = [];
-        $nextToken = null;
-        $error = null;
-
-        try {
-            $page = $this->suppression->listSuppressedDestinations(
-                $project,
-                $request->query('next_token'),
-                25
-            );
-            $summaries = $page['summaries'];
-            $nextToken = $page['next_token'];
-        } catch (InvalidArgumentException $e) {
-            Log::warning('SesSuppressionHttpHandler: index configuration error', [
-                'project_id' => $project->id,
-                'message' => $e->getMessage(),
-            ]);
-            $error = self::USER_FACING_CONFIG_ERROR;
-        } catch (AwsException $e) {
-            Log::warning('SesSuppressionHttpHandler: index AWS error', [
-                'project_id' => $project->id,
-                'aws_error_code' => $e->getAwsErrorCode(),
-                'message' => $e->getMessage(),
-            ]);
-            $error = $e->getMessage();
-        }
-
-        return [
-            'summaries' => $summaries,
-            'nextToken' => $nextToken,
-            'error' => $error,
-        ];
-    }
 
     /**
      * @return array{type: 'success'|'error', message: string}
@@ -62,11 +25,13 @@ final class SesSuppressionHttpHandler
     public function store(Project $project, string $email, string $reason): array
     {
         try {
+            $normalized = strtolower($email);
             $this->suppression->putSuppressedDestination(
                 $project,
-                strtolower($email),
+                $normalized,
                 $reason
             );
+            $this->mirror->upsertEmailFromAws($project, $normalized);
         } catch (InvalidArgumentException $e) {
             Log::warning('SesSuppressionHttpHandler: store configuration error', [
                 'project_id' => $project->id,
@@ -86,8 +51,10 @@ final class SesSuppressionHttpHandler
      */
     public function destroy(Project $project, string $email): array
     {
+        $normalized = strtolower($email);
+
         try {
-            $this->suppression->deleteSuppressedDestination($project, strtolower($email));
+            $this->suppression->deleteSuppressedDestination($project, $normalized);
         } catch (InvalidArgumentException $e) {
             Log::warning('SesSuppressionHttpHandler: destroy configuration error', [
                 'project_id' => $project->id,
@@ -97,12 +64,29 @@ final class SesSuppressionHttpHandler
             return ['type' => 'error', 'message' => self::USER_FACING_CONFIG_ERROR];
         } catch (AwsException $e) {
             if ($e->getAwsErrorCode() === 'NotFoundException') {
+                $this->mirror->deleteLocal($project, $normalized);
+
                 return ['type' => 'success', 'message' => 'Address was not on the list (already removed).'];
             }
 
             return ['type' => 'error', 'message' => 'Could not remove address: '.$e->getMessage()];
         }
 
+        $this->mirror->deleteLocal($project, $normalized);
+
         return ['type' => 'success', 'message' => 'Address removed from the suppression list.'];
+    }
+
+    /**
+     * @return array<string, string|null>
+     */
+    public function redirectListQuery(Request $request): array
+    {
+        return array_filter([
+            'q' => $request->input('q') ?? $request->query('q'),
+            'sort' => $request->input('sort') ?? $request->query('sort'),
+            'direction' => $request->input('direction') ?? $request->query('direction'),
+            'page' => $request->input('page') ?? $request->query('page'),
+        ], fn ($v) => $v !== null && $v !== '');
     }
 }

@@ -36,6 +36,7 @@ class Project extends Model
         'ses_suppression_push_complaints' => 'boolean',
         'ses_suppression_push_soft_bounces' => 'boolean',
         'ses_aws_secret_access_key' => 'encrypted',
+        'ses_suppression_list_synced_at' => 'datetime',
     ];
 
     /**

@@ -11,8 +11,7 @@
 @section('page-content')
     @include('ses-suppression._body', [
         'project' => $project,
-        'summaries' => $summaries,
-        'nextToken' => $nextToken,
+        'destinations' => $destinations,
         'error' => $error,
         'indexRoute' => $indexRoute,
         'storeRoute' => $storeRoute,

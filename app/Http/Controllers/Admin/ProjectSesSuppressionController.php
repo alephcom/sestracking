@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Support\SesSuppressionHttpHandler;
 use App\Models\Project;
+use App\Services\SesSuppressedDestinationLister;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -12,20 +13,26 @@ use Illuminate\View\View;
 class ProjectSesSuppressionController extends Controller
 {
     public function __construct(
-        private readonly SesSuppressionHttpHandler $handler
+        private readonly SesSuppressionHttpHandler $handler,
+        private readonly SesSuppressedDestinationLister $lister
     ) {}
 
     public function index(Request $request, Project $project): View
     {
         $this->authorize('update', $project);
 
-        $page = $this->handler->listPage($request, $project);
+        $error = null;
+        $destinations = null;
+        if (! $project->canRunSesSuppressionApi()) {
+            $error = SesSuppressionHttpHandler::USER_FACING_CONFIG_ERROR;
+        } else {
+            $destinations = $this->lister->paginate($project, $request);
+        }
 
         return view('admin.projects.ses-suppression.index', [
             'project' => $project,
-            'summaries' => $page['summaries'],
-            'nextToken' => $page['nextToken'],
-            'error' => $page['error'],
+            'destinations' => $destinations,
+            'error' => $error,
             'indexRoute' => 'admin.projects.ses-suppression.index',
             'storeRoute' => 'admin.projects.ses-suppression.store',
             'destroyRoute' => 'admin.projects.ses-suppression.destroy',
@@ -45,7 +52,10 @@ class ProjectSesSuppressionController extends Controller
 
         $result = $this->handler->store($project, $data['email'], $data['reason']);
 
-        $redirect = redirect()->route('admin.projects.ses-suppression.index', $project);
+        $redirect = redirect()->route(
+            'admin.projects.ses-suppression.index',
+            array_merge(['project' => $project], $this->handler->redirectListQuery($request))
+        );
 
         return $result['type'] === 'success'
             ? $redirect->with('success', $result['message'])
@@ -62,7 +72,10 @@ class ProjectSesSuppressionController extends Controller
 
         $result = $this->handler->destroy($project, $data['email']);
 
-        $redirect = redirect()->route('admin.projects.ses-suppression.index', $project);
+        $redirect = redirect()->route(
+            'admin.projects.ses-suppression.index',
+            array_merge(['project' => $project], $this->handler->redirectListQuery($request))
+        );
 
         return $result['type'] === 'success'
             ? $redirect->with('success', $result['message'])

@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Project;
+use App\Models\SesSuppressedDestination;
 use App\Models\User;
-use App\Services\SesSuppressionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
@@ -26,23 +26,20 @@ class ProjectSesSuppressionControllerTest extends TestCase
     public function project_admin_can_view_suppression_list_page(): void
     {
         $user = User::factory()->withTwoFactorEnrolled()->create();
-        $project = Project::factory()->create();
+        $project = Project::factory()->create([
+            'ses_aws_access_key_id' => 'AKIATESTADMIN',
+            'ses_aws_secret_access_key' => 'secret-for-admin-suppression-test',
+            'ses_aws_default_region' => 'us-east-1',
+        ]);
         $user->projects()->attach($project->id, ['role' => User::ROLE_ADMIN]);
 
-        $this->mock(SesSuppressionService::class, function ($mock): void {
-            $mock->shouldReceive('listSuppressedDestinations')
-                ->once()
-                ->andReturn([
-                    'summaries' => [
-                        [
-                            'email' => 'blocked@example.com',
-                            'reason' => 'BOUNCE',
-                            'last_update_time' => '2025-06-01T12:00:00.000Z',
-                        ],
-                    ],
-                    'next_token' => null,
-                ]);
-        });
+        SesSuppressedDestination::query()->create([
+            'project_id' => $project->id,
+            'email' => 'blocked@example.com',
+            'reason' => 'BOUNCE',
+            'last_update_time' => now(),
+            'synced_at' => now(),
+        ]);
 
         $response = $this->actingAs($user)
             ->get(route('admin.projects.ses-suppression.index', $project));
