@@ -71,6 +71,11 @@
     <h6 class="sidebar-heading"><span>Settings</span></h6>
     <ul class="nav flex-column mb-2">
       <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('ses-suppression.*') ? 'active' : '' }}" href="{{ route('ses-suppression.chooser') }}">
+          <i class="fas fa-ban"></i><span>SES suppression</span>
+        </a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('send_test') ? 'active' : '' }}" href="{{ route('send_test') }}">
           <i class="far fa-paper-plane"></i><span>Send Test Mail</span>
         </a>

@@ -41,6 +41,11 @@
       <span id="selected-projects-summary" class="text-muted small"></span>
     </div>
 
+    <div class="alert alert-light border mb-4 d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <span class="mb-0">Manage the Amazon SES account-level suppression list for your projects.</span>
+      <a href="{{ route('ses-suppression.chooser') }}" class="btn btn-sm btn-outline-primary">Open SES suppression lists</a>
+    </div>
+
     <div id="app"></div>
   @else
     <div class="card">

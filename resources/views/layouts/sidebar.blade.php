@@ -26,6 +26,12 @@
     </h6>
     <ul class="nav flex-column mb-2">
       <li class="nav-item">
+        <a class="nav-link {{ request()->routeIs('ses-suppression.*') ? 'active' : '' }}" href="{{ route('ses-suppression.chooser') }}" data-tooltip="SES suppression">
+          <i class="fas fa-ban"></i>
+          <span>SES suppression</span>
+        </a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('send_test') ? 'active' : '' }}" href="{{ route('send_test') }}" data-tooltip="Send Test Mail">
           <i class="far fa-paper-plane"></i>
           <span>Send Test Mail</span>
