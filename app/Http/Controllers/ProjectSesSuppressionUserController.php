@@ -1,15 +1,14 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Http\Controllers\Support\SesSuppressionHttpHandler;
 use App\Models\Project;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
-class ProjectSesSuppressionController extends Controller
+class ProjectSesSuppressionUserController extends Controller
 {
     public function __construct(
         private readonly SesSuppressionHttpHandler $handler
@@ -17,26 +16,26 @@ class ProjectSesSuppressionController extends Controller
 
     public function index(Request $request, Project $project): View
     {
-        $this->authorize('update', $project);
+        $this->authorize('view', $project);
 
         $page = $this->handler->listPage($request, $project);
 
-        return view('admin.projects.ses-suppression.index', [
+        return view('ses-suppression.index', [
             'project' => $project,
             'summaries' => $page['summaries'],
             'nextToken' => $page['nextToken'],
             'error' => $page['error'],
-            'indexRoute' => 'admin.projects.ses-suppression.index',
-            'storeRoute' => 'admin.projects.ses-suppression.store',
-            'destroyRoute' => 'admin.projects.ses-suppression.destroy',
-            'backUrl' => route('admin.projects.edit', $project),
-            'backLabel' => 'Back to project',
+            'indexRoute' => 'ses-suppression.index',
+            'storeRoute' => 'ses-suppression.store',
+            'destroyRoute' => 'ses-suppression.destroy',
+            'backUrl' => route('ses-suppression.chooser'),
+            'backLabel' => 'All projects',
         ]);
     }
 
     public function store(Request $request, Project $project): RedirectResponse
     {
-        $this->authorize('update', $project);
+        $this->authorize('view', $project);
 
         $data = $request->validate([
             'email' => ['required', 'email'],
@@ -45,7 +44,7 @@ class ProjectSesSuppressionController extends Controller
 
         $result = $this->handler->store($project, $data['email'], $data['reason']);
 
-        $redirect = redirect()->route('admin.projects.ses-suppression.index', $project);
+        $redirect = redirect()->route('ses-suppression.index', $project);
 
         return $result['type'] === 'success'
             ? $redirect->with('success', $result['message'])
@@ -54,7 +53,7 @@ class ProjectSesSuppressionController extends Controller
 
     public function destroy(Request $request, Project $project): RedirectResponse
     {
-        $this->authorize('update', $project);
+        $this->authorize('view', $project);
 
         $data = $request->validate([
             'email' => ['required', 'email'],
@@ -62,7 +61,7 @@ class ProjectSesSuppressionController extends Controller
 
         $result = $this->handler->destroy($project, $data['email']);
 
-        $redirect = redirect()->route('admin.projects.ses-suppression.index', $project);
+        $redirect = redirect()->route('ses-suppression.index', $project);
 
         return $result['type'] === 'success'
             ? $redirect->with('success', $result['message'])

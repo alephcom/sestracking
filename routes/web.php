@@ -3,6 +3,8 @@
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\Admin\ProjectSesSuppressionController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ProjectSesSuppressionUserController;
+use App\Http\Controllers\SesSuppressionChooserController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\SendTestController;
@@ -79,6 +81,13 @@ Route::group([
     // Project request routes (available to all authenticated users)
     Route::get('project-requests/create', [App\Http\Controllers\ProjectRequestController::class, 'create'])->name('project-requests.create');
     Route::post('project-requests', [App\Http\Controllers\ProjectRequestController::class, 'store'])->name('project-requests.store');
+
+    Route::get('ses-suppression', [SesSuppressionChooserController::class, 'index'])->name('ses-suppression.chooser');
+    Route::middleware(['throttle:60,1'])->group(function () {
+        Route::get('projects/{project}/ses-suppression', [ProjectSesSuppressionUserController::class, 'index'])->name('ses-suppression.index');
+        Route::post('projects/{project}/ses-suppression', [ProjectSesSuppressionUserController::class, 'store'])->name('ses-suppression.store');
+        Route::delete('projects/{project}/ses-suppression', [ProjectSesSuppressionUserController::class, 'destroy'])->name('ses-suppression.destroy');
+    });
 
 });
 
