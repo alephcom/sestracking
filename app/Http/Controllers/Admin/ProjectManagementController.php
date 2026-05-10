@@ -123,8 +123,14 @@ class ProjectManagementController extends Controller
             'ses_aws_default_region' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9-]+$/'],
         ]);
 
-        $keyRaw = $request->input('ses_aws_access_key_id');
-        $key = is_string($keyRaw) && trim($keyRaw) !== '' ? trim($keyRaw) : null;
+        $input = $request->all();
+
+        $key = $project->ses_aws_access_key_id;
+        if (array_key_exists('ses_aws_access_key_id', $input)) {
+            $keyRaw = $request->input('ses_aws_access_key_id');
+            $key = is_string($keyRaw) && trim($keyRaw) !== '' ? trim($keyRaw) : null;
+        }
+
         $secretPresent = $request->filled('ses_aws_secret_access_key');
 
         if ($key && ! $secretPresent && ! $project->ses_aws_secret_access_key) {
@@ -139,8 +145,11 @@ class ProjectManagementController extends Controller
             ]);
         }
 
-        $regionRaw = $request->input('ses_aws_default_region');
-        $region = is_string($regionRaw) && trim($regionRaw) !== '' ? trim($regionRaw) : null;
+        $region = $project->ses_aws_default_region;
+        if (array_key_exists('ses_aws_default_region', $input)) {
+            $regionRaw = $request->input('ses_aws_default_region');
+            $region = is_string($regionRaw) && trim($regionRaw) !== '' ? trim($regionRaw) : null;
+        }
 
         $update = [
             'name' => $request->name,

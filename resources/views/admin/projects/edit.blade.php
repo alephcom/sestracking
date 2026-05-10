@@ -134,10 +134,19 @@
 
             <h5 class="h6 text-muted">AWS credentials for SES suppression (required for list / add / remove / auto-push)</h5>
             <p class="small text-muted">Suppression list APIs and webhook auto-push use <strong>only</strong> these per-project keys (not <code>AWS_ACCESS_KEY_ID</code> in <code>.env</code>). Set Access Key ID, Secret Access Key, and region (or leave region blank to use <code>AWS_DEFAULT_REGION</code> / <code>services.ses.region</code> for the API endpoint only).</p>
+            @php
+                $__oldInput = session()->getOldInput();
+                $__sesAccessKey = array_key_exists('ses_aws_access_key_id', $__oldInput)
+                    ? ($__oldInput['ses_aws_access_key_id'] ?? '')
+                    : $project->ses_aws_access_key_id;
+                $__sesRegion = array_key_exists('ses_aws_default_region', $__oldInput)
+                    ? ($__oldInput['ses_aws_default_region'] ?? '')
+                    : $project->ses_aws_default_region;
+            @endphp
             <div class="form-group mb-3">
                 <label for="ses_aws_access_key_id">Access Key ID</label>
                 <input type="text" name="ses_aws_access_key_id" id="ses_aws_access_key_id" class="form-control @error('ses_aws_access_key_id') is-invalid @enderror"
-                    value="{{ old('ses_aws_access_key_id', $project->ses_aws_access_key_id) }}" autocomplete="off">
+                    value="{{ $__sesAccessKey }}" autocomplete="off">
                 @error('ses_aws_access_key_id')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
@@ -153,7 +162,7 @@
             <div class="form-group mb-3">
                 <label for="ses_aws_default_region">AWS region</label>
                 <input type="text" name="ses_aws_default_region" id="ses_aws_default_region" class="form-control @error('ses_aws_default_region') is-invalid @enderror"
-                    value="{{ old('ses_aws_default_region', $project->ses_aws_default_region) }}" placeholder="e.g. us-east-1">
+                    value="{{ $__sesRegion }}" placeholder="e.g. us-east-1">
                 @error('ses_aws_default_region')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
