@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('email', 255);
             $table->string('reason', 64);
             $table->timestamp('last_update_time')->nullable();
-            $table->timestamp('synced_at');
+            $table->timestamp('synced_at')->nullable();
             $table->timestamps();
 
             $table->unique(['project_id', 'email']);
