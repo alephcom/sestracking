@@ -261,7 +261,18 @@ class DashboardApp {
     `;
   }
 
+  formatChartLabel(label, granularity) {
+    const m = moment(label);
+    if (granularity === '30m' || granularity === '1h') {
+      return m.format('MMM D, HH:mm');
+    }
+    return m.format('L');
+  }
+
   fillChartData(data) {
+    const granularity = data.granularity || '1d';
+    const dense = granularity === '30m' || granularity === '1h';
+
     const datasets = data.datasets.map(element => ({
       label:           element.label,
       data:            element.data,
@@ -269,11 +280,11 @@ class DashboardApp {
       borderColor:     this.chartColors[element.label],
       fill:            false,
       tension:         0.3,
-      pointRadius:     3,
+      pointRadius:     dense ? 2 : 3,
       pointHoverRadius: 5
     }));
 
-    const labels = data.labels.map(label => moment(label).format('L'));
+    const labels = data.labels.map(label => this.formatChartLabel(label, granularity));
 
     if (this.chart) {
       this.chart.destroy();
@@ -295,6 +306,14 @@ class DashboardApp {
           interaction: {
             mode: 'nearest',
             intersect: true
+          },
+          scales: {
+            x: {
+              ticks: {
+                maxTicksLimit: dense ? 12 : 16,
+                autoSkip: true,
+              }
+            }
           }
         }
       });

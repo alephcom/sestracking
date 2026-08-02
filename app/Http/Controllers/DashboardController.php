@@ -2,7 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{Project, Email, RecipientEvent};
+use App\Models\Email;
+use App\Services\DashboardChartAggregator;
 use App\Services\ProjectAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -23,7 +24,7 @@ class DashboardController extends Controller
     }
 
 
-    public function jsApi(Request $request, ProjectAccessService $projectService)
+    public function jsApi(Request $request, ProjectAccessService $projectService, DashboardChartAggregator $chartAggregator)
     {
         $user = auth()->user();
         $accessibleProjectIds = $projectService->getAccessibleProjectIds($user);
@@ -66,6 +67,7 @@ class DashboardController extends Controller
                 'chartData' => [
                     'labels' => [],
                     'datasets' => [],
+                    'granularity' => '1d',
                 ],
             ]);
         }
@@ -86,15 +88,20 @@ class DashboardController extends Controller
             $tzOffset
         );
 
-        $data = Cache::remember($cacheKey, 300, function () use ($selectedProjectIds, $dateFrom, $dateTo, $tzOffset) {
-            return $this->buildDashboardData($selectedProjectIds, $dateFrom, $dateTo, $tzOffset);
+        $data = Cache::remember($cacheKey, 300, function () use ($selectedProjectIds, $dateFrom, $dateTo, $tzOffset, $chartAggregator) {
+            return $this->buildDashboardData($selectedProjectIds, $dateFrom, $dateTo, $tzOffset, $chartAggregator);
         });
 
         return response()->json($data);
     }
 
-    private function buildDashboardData(array $selectedProjectIds, Carbon $dateFrom, Carbon $dateTo, int $tzOffset): array
-    {
+    private function buildDashboardData(
+        array $selectedProjectIds,
+        Carbon $dateFrom,
+        Carbon $dateTo,
+        int $tzOffset,
+        DashboardChartAggregator $chartAggregator
+    ): array {
         // Direct JOIN avoids nested EXISTS subqueries from whereHas
         $eventsCount = DB::table('recipient_events as re')
             ->join('email_recipients as er', 're.recipient_id', '=', 'er.id')
@@ -132,7 +139,7 @@ class DashboardController extends Controller
         $bounceRate = $sent > 0 ? round($bounceCount / $sent * 100, 2) : 0;
         $complaintRate = $sent > 0 ? round($complaintCount / $sent * 100, 2) : 0;
 
-        $chartData = $this->buildChartData($selectedProjectIds, $dateFrom, $dateTo, $tzOffset);
+        $chartData = $this->buildChartData($selectedProjectIds, $dateFrom, $dateTo, $tzOffset, $chartAggregator);
 
         $totalEmails = Email::whereIn('project_id', $selectedProjectIds)
             ->whereBetween('sent_at', [$dateFrom, $dateTo])
@@ -147,32 +154,37 @@ class DashboardController extends Controller
         ];
     }
 
-    private function buildChartData(array $selectedProjectIds, Carbon $dateFrom, Carbon $dateTo, int $tzOffset): array
-    {
+    private function buildChartData(
+        array $selectedProjectIds,
+        Carbon $dateFrom,
+        Carbon $dateTo,
+        int $tzOffset,
+        DashboardChartAggregator $chartAggregator
+    ): array {
+        $minutes = $chartAggregator->bucketMinutes($dateFrom, $dateTo);
+        $labelsArray = $chartAggregator->buildLabels($dateFrom, $dateTo, $tzOffset, $minutes);
+        $labelIndex = array_flip($labelsArray);
         $grouped = [];
-        $labels = [];
 
         if (DB::connection()->getDriverName() === 'mysql') {
-            // Push grouping and timezone offset entirely into SQL — avoids loading
-            // individual event rows into PHP memory
+            [$select, $bindings] = $chartAggregator->mysqlBucketSelect($tzOffset, $minutes);
+
             $events = DB::table('recipient_events as re')
                 ->join('email_recipients as er', 're.recipient_id', '=', 'er.id')
                 ->join('emails as e', 'er.email_id', '=', 'e.id')
-                ->selectRaw('re.type, DATE(DATE_ADD(re.event_at, INTERVAL ? MINUTE)) as daygroup, COUNT(*) as count', [$tzOffset])
+                ->selectRaw($select, $bindings)
                 ->whereIn('e.project_id', $selectedProjectIds)
                 ->whereBetween('re.event_at', [$dateFrom, $dateTo])
-                ->groupBy('daygroup', 're.type')
+                ->groupBy('bucket', 're.type')
                 ->get();
 
             foreach ($events as $event) {
-                $daygroup = $event->daygroup;
-                $key = $daygroup . '_' . $event->type;
-                $grouped[$key] = [
-                    'daygroup' => $daygroup,
+                $bucket = $chartAggregator->bucketKey(Carbon::parse($event->bucket), $minutes);
+                $grouped[$bucket . '_' . $event->type] = [
+                    'bucket' => $bucket,
                     'type' => $event->type,
-                    'count' => $event->count,
+                    'count' => (int) $event->count,
                 ];
-                $labels[$daygroup] = $daygroup;
             }
         } else {
             // SQLite fallback: fetch minimal columns and group in PHP
@@ -189,23 +201,19 @@ class DashboardController extends Controller
                 if ($tzOffset !== 0) {
                     $eventDate->addMinutes($tzOffset);
                 }
-                $daygroup = $eventDate->format('Y-m-d');
-                $key = $daygroup . '_' . $event->type;
+                $bucket = $chartAggregator->bucketKey($eventDate, $minutes);
+                $key = $bucket . '_' . $event->type;
                 if (!isset($grouped[$key])) {
-                    $grouped[$key] = ['daygroup' => $daygroup, 'type' => $event->type, 'count' => 0];
-                    $labels[$daygroup] = $daygroup;
+                    $grouped[$key] = ['bucket' => $bucket, 'type' => $event->type, 'count' => 0];
                 }
                 $grouped[$key]['count']++;
             }
         }
 
-        ksort($labels);
-        $labelsArray = array_values($labels);
-
         $datasets = [];
         foreach ($grouped as $item) {
             $type = $item['type'];
-            $daygroup = $item['daygroup'];
+            $bucket = $item['bucket'];
             $count = $item['count'];
 
             if (empty($datasets[$type])) {
@@ -215,15 +223,15 @@ class DashboardController extends Controller
                 ];
             }
 
-            $index = array_search($daygroup, $labelsArray);
-            if ($index !== false) {
-                $datasets[$type]['data'][$index] = $count;
+            if (isset($labelIndex[$bucket])) {
+                $datasets[$type]['data'][$labelIndex[$bucket]] = $count;
             }
         }
 
         return [
-            'labels' => array_values($labels),
+            'labels' => $labelsArray,
             'datasets' => array_values($datasets),
+            'granularity' => $chartAggregator->granularity($minutes),
         ];
     }
 }
