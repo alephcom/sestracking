@@ -42,7 +42,12 @@ class ProjectAccessService
      */
     public function getAccessibleProjectIds(User $user): array
     {
-        return $this->getAccessibleProjects($user)->pluck('id')->toArray();
+        // Pluck in SQL rather than loading full Project models just to read their IDs.
+        if ($user->isSuperAdmin()) {
+            return Project::query()->pluck('id')->all();
+        }
+
+        return $user->projects()->pluck('projects.id')->all();
     }
 
     /**
@@ -50,6 +55,10 @@ class ProjectAccessService
      */
     public function hasAccessToProjectId(User $user, int $projectId): bool
     {
-        return in_array($projectId, $this->getAccessibleProjectIds($user));
+        if ($user->isSuperAdmin()) {
+            return Project::whereKey($projectId)->exists();
+        }
+
+        return $user->projects()->whereKey($projectId)->exists();
     }
 }

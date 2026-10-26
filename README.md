@@ -200,6 +200,7 @@ Each project has a unique token that routes events to the right project. The tok
 
 - **SNS signatures are verified.** Subscription confirmations are always checked, and notifications are checked while `SES_WEBHOOK_VERIFY_SIGNATURES=true` (the default). The server downloads AWS's signing certificate from `sns.<region>.amazonaws.com`, so that host must be reachable.
 - **Raw SES payloads** (event JSON not wrapped in an SNS envelope) cannot be signed and are rejected unless `SES_WEBHOOK_ALLOW_DIRECT_PAYLOADS=true`.
+- **Bounce / complaint alerts** are checked by a queued job (`CheckProjectAlertRatesJob`) about a minute after events arrive, once per project no matter how many events came in. Run a queue worker (`php artisan queue:work`) so these checks — and the queued SES suppression pushes — actually run. With `QUEUE_CONNECTION=sync` the check runs inline on every webhook, as it did before.
 - **Topic allowlist (recommended):** set `SES_WEBHOOK_ALLOWED_TOPIC_ARNS` to a comma-separated list of SNS TopicArn patterns, e.g. `arn:aws:sns:*:123456789012:*`. Messages from other AWS accounts' topics are then rejected, even if someone learns a webhook URL.
 
 ## Sign-in security

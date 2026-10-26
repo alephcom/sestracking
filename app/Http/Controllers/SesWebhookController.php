@@ -2,22 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\CheckProjectAlertRatesJob;
 use App\Models\Email;
 use App\Models\EmailRecipient;
 use App\Models\Project;
 use App\Models\RecipientEvent;
-use App\Notifications\BounceRateAlert;
 use App\Services\SesWebhookSuppressionDispatcher;
 use Aws\Sns\Exception\InvalidSnsMessageException;
 use Aws\Sns\Message;
 use Aws\Sns\MessageValidator;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 
 use function Sentry\captureMessage;
@@ -328,7 +325,9 @@ class SesWebhookController extends Controller
             }
         }
 
-        $this->checkRateThresholdsAndNotify($project);
+        // Runs on the queue a little later; repeated events for the same project collapse into one check.
+        CheckProjectAlertRatesJob::dispatch($project->id)
+            ->delay(now()->addSeconds(CheckProjectAlertRatesJob::DELAY_SECONDS));
 
         return response('OK');
     }
@@ -549,64 +548,5 @@ class SesWebhookController extends Controller
         }
 
         return $ses['delivery']['recipients'] ?? $ses['mail']['destination'] ?? [];
-    }
-
-    /**
-     * Check rolling 24h bounce/complaint rates and notify project admins if thresholds are exceeded.
-     *
-     * Rates use recipient_events in the last 24h: sends as the denominator; the bounce numerator is
-     * bounce + reject + rendering_failure; complaint numerator is complaint events.
-     * Alerts are suppressed for 6 hours per project per metric to avoid repeat emails.
-     */
-    private function checkRateThresholdsAndNotify(Project $project): void
-    {
-        $since = now()->subDay();
-        $eventsCount = DB::table('recipient_events as re')
-            ->join('email_recipients as er', 're.recipient_id', '=', 'er.id')
-            ->join('emails as e', 'er.email_id', '=', 'e.id')
-            ->where('e.project_id', $project->id)
-            ->where('re.event_at', '>=', $since)
-            ->selectRaw('re.type, COUNT(*) as count')
-            ->groupBy('re.type')
-            ->get();
-
-        $counters = [];
-        foreach ($eventsCount as $row) {
-            $counters[$row->type] = (int) $row->count;
-        }
-        $sent = $counters['send'] ?? 0;
-        if ($sent === 0) {
-            return;
-        }
-
-        // Treat reject and rendering_failure like bounces for alerting (delivery failures / content issues).
-        $bounceCount = ($counters['bounce'] ?? 0)
-            + ($counters['reject'] ?? 0)
-            + ($counters['rendering_failure'] ?? 0);
-        $complaintCount = $counters['complaint'] ?? 0;
-        $bounceRate = round($bounceCount / $sent * 100, 2);
-        $complaintRate = round($complaintCount / $sent * 100, 2);
-
-        $bounceThreshold = (float) ($project->alert_bounce_rate ?? 5.0);
-        $complaintThreshold = (float) ($project->alert_complaint_rate ?? 0.1);
-
-        $bounceCacheKey = 'alert-sent:'.$project->id.':bounce';
-        $complaintCacheKey = 'alert-sent:'.$project->id.':complaint';
-
-        if ($bounceRate > $bounceThreshold && ! Cache::get($bounceCacheKey)) {
-            $admins = $project->admins()->get();
-            if ($admins->isNotEmpty()) {
-                Notification::send($admins, new BounceRateAlert($project, 'bounce', $bounceRate, $bounceThreshold));
-                Cache::put($bounceCacheKey, true, now()->addHours(6));
-            }
-        }
-
-        if ($complaintRate > $complaintThreshold && ! Cache::get($complaintCacheKey)) {
-            $admins = $project->admins()->get();
-            if ($admins->isNotEmpty()) {
-                Notification::send($admins, new BounceRateAlert($project, 'complaint', $complaintRate, $complaintThreshold));
-                Cache::put($complaintCacheKey, true, now()->addHours(6));
-            }
-        }
     }
 }

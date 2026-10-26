@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Open and click counters no longer increase when SNS retries a notification, including on emails with several recipients (where the retry used to be stored against the next recipient)
 
 ### Performance
+- Bounce/complaint rate alerts no longer recount the project's last 24 hours inside every webhook request. The check runs as a unique, delayed queued job (`CheckProjectAlertRatesJob`), so a burst of events triggers one check per project. Requires a queue worker
+- `ProjectAccessService::getAccessibleProjectIds` plucks IDs in SQL instead of loading every project model (all projects, for super admins) on each dashboard, activity and report request; `hasAccessToProjectId` uses an `exists` query
 - Added database indexes on `recipient_events.event_at`, `recipient_events.recipient_id`, `emails.sent_at`, and `emails.source` — eliminates full-table scans on the largest tables, the single biggest factor in slow dashboard loads at scale
 - Added MySQL `FULLTEXT` indexes on `emails.subject` and `email_recipients.address` for future full-text search support
 - Dashboard counter query rewritten from `whereHas` (nested `EXISTS` subqueries traversing two relationship levels) to a direct 3-table JOIN with `GROUP BY` — executed as a single efficient query

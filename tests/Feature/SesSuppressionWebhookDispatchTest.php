@@ -88,7 +88,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
 
         $this->postJson('/webhook/ses-suppress-token', $payload)->assertOk();
 
-        Bus::assertNothingDispatched();
+        Bus::assertNotDispatched(PushSuppressedDestinationJob::class);
     }
 
     /** @test */
@@ -116,7 +116,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
 
         $this->postJson('/webhook/ses-suppress-token', $payload)->assertOk();
 
-        Bus::assertNothingDispatched();
+        Bus::assertNotDispatched(PushSuppressedDestinationJob::class);
     }
 
     /** @test */
@@ -143,7 +143,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
 
         $this->postJson('/webhook/ses-suppress-token', $payload)->assertOk();
 
-        Bus::assertNothingDispatched();
+        Bus::assertNotDispatched(PushSuppressedDestinationJob::class);
     }
 
     /** @test */
@@ -228,7 +228,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
 
         $this->postJson('/webhook/ses-suppress-token', $payload)->assertOk();
 
-        Bus::assertNothingDispatched();
+        Bus::assertNotDispatched(PushSuppressedDestinationJob::class);
     }
 
     /** @test */

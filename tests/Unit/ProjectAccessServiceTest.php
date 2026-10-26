@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Services\ProjectAccessService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ProjectAccessServiceTest extends TestCase
@@ -135,5 +136,32 @@ class ProjectAccessServiceTest extends TestCase
         $user->projects()->attach($project1->id, ['role' => 'user']);
 
         $this->assertFalse($this->service->hasAccessToProjectId($user, $project2->id));
+    }
+
+    /** @test */
+    public function get_accessible_project_ids_selects_only_ids(): void
+    {
+        $superAdmin = User::factory()->create(['super_admin' => true]);
+        $user = User::factory()->create(['super_admin' => false]);
+        $project = Project::factory()->create();
+        $user->projects()->attach($project->id, ['role' => 'user']);
+
+        DB::enableQueryLog();
+        $this->service->getAccessibleProjectIds($superAdmin);
+        $this->service->getAccessibleProjectIds($user);
+        $queries = array_column(DB::getQueryLog(), 'query');
+
+        $this->assertCount(2, $queries);
+        foreach ($queries as $sql) {
+            $this->assertStringNotContainsString('*', $sql, "Expected an id-only select, got: {$sql}");
+        }
+    }
+
+    /** @test */
+    public function has_access_to_project_id_returns_false_for_missing_project_even_for_super_admin(): void
+    {
+        $superAdmin = User::factory()->create(['super_admin' => true]);
+
+        $this->assertFalse($this->service->hasAccessToProjectId($superAdmin, 999999));
     }
 }
