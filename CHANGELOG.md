@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SSO links or auto-creates accounts by email only when the provider vouches for it (Google `email_verified`, Microsoft single-tenant); session is regenerated after SSO sign-in
 - Two-factor challenge flow hardened: per-user rate limiting on verification; abort/cancel uses a CSRF-protected POST; “remember me” is preserved through the 2FA step; documentation updated for the new behavior
 
+### Fixed
+- Activity export now uses the same query as the on-screen list: status and destination come from recipients, dates filter on `sent_at`, and the event-type filter no longer queries the removed `email_events` table. Rows are streamed in batches instead of loaded into memory at once
+- Invalid `dateFrom` / `dateTo` on the activity list and export return a validation error instead of a server error
+- Open and click counters no longer increase when SNS retries a notification, including on emails with several recipients (where the retry used to be stored against the next recipient)
+
 ### Performance
 - Added database indexes on `recipient_events.event_at`, `recipient_events.recipient_id`, `emails.sent_at`, and `emails.source` — eliminates full-table scans on the largest tables, the single biggest factor in slow dashboard loads at scale
 - Added MySQL `FULLTEXT` indexes on `emails.subject` and `email_recipients.address` for future full-text search support

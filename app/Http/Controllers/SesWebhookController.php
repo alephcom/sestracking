@@ -194,6 +194,18 @@ class SesWebhookController extends Controller
                 );
             }
 
+            // An SNS retry redelivers the same MessageId. The recipient picked below depends on
+            // which recipients already have this event type, so a retry would otherwise be
+            // stored against the next recipient and counted twice.
+            $alreadyRecorded = RecipientEvent::where('sns_message_id', $messageId)
+                ->where('type', $type)
+                ->whereIn('recipient_id', EmailRecipient::where('email_id', $email->id)->select('id'))
+                ->exists();
+
+            if ($alreadyRecorded) {
+                return response('OK');
+            }
+
             // Find first recipient who doesn't already have this event type
             $availableRecipient = EmailRecipient::where('email_id', $email->id)
                 ->whereNotExists(function ($query) use ($type) {
@@ -210,7 +222,7 @@ class SesWebhookController extends Controller
             }
 
             /* 6️⃣  Store the event for the selected recipient (use firstOrCreate to handle duplicates) */
-            RecipientEvent::firstOrCreate(
+            $recipientEvent = RecipientEvent::firstOrCreate(
                 [
                     'sns_message_id' => $messageId,
                     'recipient_id' => $availableRecipient->id,
@@ -224,12 +236,9 @@ class SesWebhookController extends Controller
                 ]
             );
 
-            /* 8️⃣  Increment counters immediately for open/click */
-            if ($type === 'open') {
-                $email->increment('opens');
-            }
-            if ($type === 'click') {
-                $email->increment('clicks');
+            /* 8️⃣  Increment counters once per event; SNS retries redeliver the same MessageId */
+            if ($recipientEvent->wasRecentlyCreated) {
+                $email->increment($type === 'open' ? 'opens' : 'clicks');
             }
         } else {
             // Standard handling for other event types (send, delivery, bounce, etc.)

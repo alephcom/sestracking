@@ -9,6 +9,7 @@ use App\Utils\ActivityExport\Report;
 use App\Utils\ActivityExport\WriterFormatFactory;
 use Box\Spout\Writer\Common\Creator\WriterEntityFactory;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -47,49 +48,7 @@ class ActivityController extends Controller
             ]);
         }
 
-        $filters = [];
-
-        if ($request->get('search')) {
-            $filters['search'] = $request->get('search');
-        }
-
-        if ($request->get('eventType')) {
-            $filters['eventType'] = $request->get('eventType');
-        }
-
-        if ($dateFrom = $request->get('dateFrom')) {
-          $filters['dateFrom']  = Carbon::parse($dateFrom);  
-        }
-
-        if ($dateTo = $request->get('dateTo')) {
-            $filters['dateTo']  = Carbon::parse($dateTo);
-        }
-
-        // Build query with validated project IDs only
-        $email = Email::with('recipients')->whereIn('project_id', $selectedProjectIds);
-
-        if (!empty($filters['search'])){
-            $email->where(function($query) use ($filters) {
-                $query->whereHas('recipients', function($q) use ($filters) {
-                    $q->where('address', 'like', '%' . $filters['search'] . '%');
-                })->orWhere('subject', 'like', '%' . $filters['search'] . '%');
-            });
-        }
-
-        if (!empty($filters['dateFrom']) && !empty($filters['dateTo'])) {
-            $email->whereBetween('sent_at', [$filters['dateFrom'], $filters['dateTo']]);
-        }
-
-        if (!empty($filters['eventType'])) {
-            // whereIn subquery is more efficient than whereHas (avoids nested EXISTS
-            // traversing the hasManyThrough relationship chain)
-            $email->whereIn('emails.id', function ($query) use ($filters) {
-                $query->select('er.email_id')
-                    ->from('email_recipients as er')
-                    ->join('recipient_events as re', 'er.id', '=', 're.recipient_id')
-                    ->where('re.type', $filters['eventType']);
-            });
-        }
+        $email = $this->filteredEmailQuery($request, $selectedProjectIds)->with('recipients');
 
         $results = $email->orderBy('sent_at','desc')->paginate(10);
 
@@ -162,67 +121,11 @@ class ActivityController extends Controller
             return response()->json([]);
         }
 
-        $filters = [];
-
-        if ($request->get('search')) {
-            $filters['search'] = $request->get('search');
-        }
-
-        if ($request->get('eventType')) {
-            $filters['eventType'] = $request->get('eventType');
-        }
-
-        if ($dateFrom = $request->get('dateFrom')) {
-            try {
-                $filters['dateFrom']  = Carbon::parse($dateFrom);
-            } catch (\Exception $e) {
-                throw new \Exception('Wrong dateFrom parameter!');
-            }
-        }
-
-        if ($dateTo = $request->get('dateTo')) {
-            try {
-                $filters['dateTo']  = Carbon::parse($dateTo);
-            } catch (\Exception $e) {
-                throw new \Exception('Wrong dateTo parameter!');
-            }
-        }
-
-
-        // Build export query with validated project IDs only
-        $emails = Email::whereIn('project_id', $selectedProjectIds);
-
-        if (!empty($filters['search'])){
-            $emails->where(function($query) use ($filters) {
-                $query->where('emails.destination', 'like', '%' . $filters['search'] . '%')
-                      ->orWhere('emails.subject', 'like', '%' . $filters['search'] . '%');
-            });
-        }
-
-        if (!empty($filters['dateFrom']) && !empty($filters['dateTo'])) {
-            $emails->whereBetween('emails.created_at', [$filters['dateFrom'], $filters['dateTo']]);
-        }
-
-        if (!empty($filters['eventType'])) {
-            $emails->leftJoin('email_events','emails.id','=','email_events.email_id')
-            ->where('email_events.event_type', $filters['eventType'])
-                  ->select('emails.*');
-        } 
-
-
-        $emails = $emails->get();
-        $reports = [];
-        foreach ($emails as $email) {
-                $row = [
-                    $email->status ?? '',
-                    $email->subject ?? '',
-                    is_array($email->destination) ? implode(', ', $email->destination) : ($email->destination ?? ''),
-                    $email->created_at ? $email->created_at->format('m/d/Y H:i') : '',
-                    $email->opens ?? 0,
-                    $email->clicks ?? 0,
-                ];
-            $reports[] = $row;
-        }
+        // Same filters and data source as the on-screen list (listApi), so exports match what users see.
+        $emails = $this->filteredEmailQuery($request, $selectedProjectIds)
+            ->with('recipients')
+            ->orderBy('sent_at', 'desc')
+            ->orderBy('id', 'desc'); // unique tiebreaker so lazy() pages never skip or repeat rows
 
         try {
             $writer = $writerFormatFactory->get($request->get('format'));
@@ -231,7 +134,7 @@ class ActivityController extends Controller
         }
 
 
-        $response = new StreamedResponse(static function () use ($writer, $reports): void {
+        $response = new StreamedResponse(function () use ($writer, $emails): void {
             $writer->openToFile('php://output');
 
             $writer->addRow(WriterEntityFactory::createRowFromArray([
@@ -243,8 +146,16 @@ class ActivityController extends Controller
                 'Clicks',
             ]));
 
-            foreach ($reports as $row) {
-                $writer->addRow(WriterEntityFactory::createRowFromArray($row));
+            // lazy() pages through the results so large exports are not held in memory at once.
+            foreach ($emails->lazy(500) as $email) {
+                $writer->addRow(WriterEntityFactory::createRowFromArray([
+                    $this->getEmailStatus($email),
+                    $email->subject ?? '',
+                    $email->recipients->pluck('address')->implode(', '),
+                    $email->sent_at ? $email->sent_at->format('m/d/Y H:i') : '',
+                    $email->opens ?? 0,
+                    $email->clicks ?? 0,
+                ]));
             }
 
             $writer->close();
@@ -261,6 +172,48 @@ class ActivityController extends Controller
         }
 
         return $response;
+    }
+
+    /**
+     * Emails in the given (already access-checked) projects, filtered by the
+     * search / eventType / dateFrom / dateTo request parameters.
+     */
+    private function filteredEmailQuery(Request $request, array $projectIds): Builder
+    {
+        $filters = $request->validate([
+            'search' => 'nullable|string|max:255',
+            'eventType' => 'nullable|string|max:50',
+            'dateFrom' => 'nullable|date',
+            'dateTo' => 'nullable|date',
+        ]);
+
+        $query = Email::whereIn('project_id', $projectIds);
+
+        if (! empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($query) use ($search) {
+                $query->whereHas('recipients', function ($q) use ($search) {
+                    $q->where('address', 'like', '%'.$search.'%');
+                })->orWhere('subject', 'like', '%'.$search.'%');
+            });
+        }
+
+        if (! empty($filters['dateFrom']) && ! empty($filters['dateTo'])) {
+            $query->whereBetween('sent_at', [Carbon::parse($filters['dateFrom']), Carbon::parse($filters['dateTo'])]);
+        }
+
+        if (! empty($filters['eventType'])) {
+            // whereIn subquery is more efficient than whereHas (avoids nested EXISTS
+            // traversing the hasManyThrough relationship chain)
+            $query->whereIn('emails.id', function ($subquery) use ($filters) {
+                $subquery->select('er.email_id')
+                    ->from('email_recipients as er')
+                    ->join('recipient_events as re', 'er.id', '=', 're.recipient_id')
+                    ->where('re.type', $filters['eventType']);
+            });
+        }
+
+        return $query;
     }
 
     private function getEmailStatus($email)
