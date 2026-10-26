@@ -82,6 +82,15 @@ class SesWebhookController extends Controller
             return $this->confirmSnsSubscription($sns, $token);
         }
 
+        /* 3️⃣  Authenticate the notification itself; the URL token alone is not enough */
+        if ($rejection = $this->rejectUnverifiedNotification($sns, $token)) {
+            return $rejection;
+        }
+
+        if (($sns['Type'] ?? '') === 'UnsubscribeConfirmation') {
+            return response('OK');
+        }
+
         // Detect if this is SNS-wrapped or direct SES notification
         $messageId = null;
         $ses = null;
@@ -301,15 +310,17 @@ class SesWebhookController extends Controller
     {
         $subscribeUrl = $sns['SubscribeURL'] ?? '';
 
-        try {
-            $this->snsMessageValidator->validate(new Message($sns));
-        } catch (InvalidSnsMessageException|\InvalidArgumentException $e) {
-            Log::warning('Rejected SNS subscription confirmation: invalid signature', [
+        if (! $this->hasValidSnsSignature($sns, $token)) {
+            return response('Invalid SNS signature', 403);
+        }
+
+        if (! $this->isAllowedTopic($sns)) {
+            Log::warning('Rejected SNS subscription confirmation: topic not allowed', [
                 'token' => $token,
-                'error' => $e->getMessage(),
+                'topic_arn' => $sns['TopicArn'] ?? null,
             ]);
 
-            return response('Invalid SNS signature', 403);
+            return response('Topic not allowed', 403);
         }
 
         if (! is_string($subscribeUrl) || ! preg_match(self::SNS_SUBSCRIBE_URL_PATTERN, $subscribeUrl)) {
@@ -323,6 +334,81 @@ class SesWebhookController extends Controller
         Http::timeout(10)->get($subscribeUrl);
 
         return response('OK');
+    }
+
+    /**
+     * Returns a rejection response when a notification fails authentication, or null to continue.
+     */
+    private function rejectUnverifiedNotification(array $payload, string $token)
+    {
+        $isSnsEnvelope = isset($payload['Type']);
+
+        if ($isSnsEnvelope && ! $this->isAllowedTopic($payload)) {
+            Log::warning('Rejected SES webhook: topic not allowed', [
+                'token' => $token,
+                'topic_arn' => $payload['TopicArn'] ?? null,
+            ]);
+
+            return response('Topic not allowed', 403);
+        }
+
+        if (! config('services.ses.webhook_verify_signatures', true)) {
+            return null;
+        }
+
+        if (! $isSnsEnvelope) {
+            if (config('services.ses.webhook_allow_direct_payloads', false)) {
+                return null;
+            }
+
+            Log::warning('Rejected SES webhook: unsigned direct payload', ['token' => $token]);
+
+            return response('Unsigned payloads are not accepted', 403);
+        }
+
+        if (! $this->hasValidSnsSignature($payload, $token)) {
+            return response('Invalid SNS signature', 403);
+        }
+
+        return null;
+    }
+
+    private function hasValidSnsSignature(array $payload, string $token): bool
+    {
+        try {
+            $this->snsMessageValidator->validate(new Message($payload));
+
+            return true;
+        } catch (InvalidSnsMessageException|\InvalidArgumentException $e) {
+            Log::warning('Rejected SES webhook: invalid SNS signature', [
+                'token' => $token,
+                'sns_type' => $payload['Type'] ?? null,
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    private function isAllowedTopic(array $payload): bool
+    {
+        $patterns = config('services.ses.webhook_allowed_topic_arns', []);
+        if ($patterns === []) {
+            return true;
+        }
+
+        $topicArn = $payload['TopicArn'] ?? null;
+        if (! is_string($topicArn) || $topicArn === '') {
+            return false;
+        }
+
+        foreach ($patterns as $pattern) {
+            if (fnmatch($pattern, $topicArn)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

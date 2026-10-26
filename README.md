@@ -196,7 +196,18 @@ Configure **configuration sets** and event types (send, delivery, bounce, compla
 POST https://<your-domain.com>/webhook/{project_token}
 ```
 
-Each project has a unique token for webhook authentication.
+Each project has a unique token that routes events to the right project. The token alone is not treated as proof that a message came from AWS:
+
+- **SNS signatures are verified.** Subscription confirmations are always checked, and notifications are checked while `SES_WEBHOOK_VERIFY_SIGNATURES=true` (the default). The server downloads AWS's signing certificate from `sns.<region>.amazonaws.com`, so that host must be reachable.
+- **Raw SES payloads** (event JSON not wrapped in an SNS envelope) cannot be signed and are rejected unless `SES_WEBHOOK_ALLOW_DIRECT_PAYLOADS=true`.
+- **Topic allowlist (recommended):** set `SES_WEBHOOK_ALLOWED_TOPIC_ARNS` to a comma-separated list of SNS TopicArn patterns, e.g. `arn:aws:sns:*:123456789012:*`. Messages from other AWS accounts' topics are then rejected, even if someone learns a webhook URL.
+
+## Sign-in security
+
+- Password sign-in is limited to 5 failed attempts per email and IP per minute, and 30 attempts per IP per minute. Forgot-password, reset-password and invitation acceptance are limited to 10 requests per IP per minute.
+- Accounts linked to Google or Microsoft must sign in with SSO; the password form refuses them, since SSO accounts skip in-app TOTP.
+- SSO only links to an existing account (or auto-creates one) by email when the provider vouches for the address: Google must report `email_verified`, and Microsoft must be locked to a single tenant (`MICROSOFT_TENANT_ID` set to your tenant ID, not `common`, `organizations` or `consumers`). Users already linked are matched by provider ID and are unaffected.
+- **Send Test Mail** is available to super admins only.
 
 ## TODO
 

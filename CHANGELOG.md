@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Audit logging for password reset events
 
 ### Security
+- User management is restricted to super admins; project admins could previously edit any user, grant themselves super admin, and create or delete users
+- Profile updates require POST (the old handler saved on GET, bypassing CSRF), need the current password to change email or password, enforce unique emails and an 8-character minimum
+- SNS webhook signatures are verified (`aws/aws-php-sns-message-validator`). Subscription confirmations are always verified and the SubscribeURL must be an SNS endpoint, closing an unauthenticated SSRF. Notifications are verified by default (`SES_WEBHOOK_VERIFY_SIGNATURES`); raw SES payloads need `SES_WEBHOOK_ALLOW_DIRECT_PAYLOADS=true`; optional `SES_WEBHOOK_ALLOWED_TOPIC_ARNS` allowlist
+- Send Test Mail restricted to super admins; sender name now comes from `MAIL_FROM_NAME`
+- Login is POST-only and rate limited per email + IP and per IP; forgot-password, reset-password and invitation acceptance are rate limited per IP; logout is a CSRF-protected POST
+- Accounts linked to SSO can no longer sign in with a password (which skipped TOTP)
+- SSO links or auto-creates accounts by email only when the provider vouches for it (Google `email_verified`, Microsoft single-tenant); session is regenerated after SSO sign-in
 - Two-factor challenge flow hardened: per-user rate limiting on verification; abort/cancel uses a CSRF-protected POST; “remember me” is preserved through the 2FA step; documentation updated for the new behavior
 
 ### Performance

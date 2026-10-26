@@ -118,7 +118,7 @@ class AuthenticationTest extends TestCase
         $this->actingAs($user);
         $this->assertAuthenticated();
 
-        $response = $this->get('/logout');
+        $response = $this->post('/logout');
 
         $response->assertRedirect('/login');
         $this->assertGuest();

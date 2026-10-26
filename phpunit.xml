@@ -27,6 +27,8 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <!-- Most webhook tests post unsigned fixtures; signature checks are covered in SnsSignatureVerificationTest -->
+        <env name="SES_WEBHOOK_VERIFY_SIGNATURES" value="false"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
     </php>

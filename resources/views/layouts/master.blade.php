@@ -34,9 +34,12 @@
   </div>
   <ul class="navbar-nav px-3">
     <li class="nav-item text-nowrap">
-      <a class="nav-link" href="{{ route('logout') }}">
-        <i class="fas fa-sign-out-alt me-1"></i> Sign out
-      </a>
+      <form method="POST" action="{{ route('logout') }}" class="d-inline">
+        @csrf
+        <button type="submit" class="nav-link btn btn-link border-0">
+          <i class="fas fa-sign-out-alt me-1"></i> Sign out
+        </button>
+      </form>
     </li>
   </ul>
 </nav>
@@ -75,11 +78,13 @@
           <i class="fas fa-ban"></i><span>SES suppression</span>
         </a>
       </li>
+      @can('send-test-email')
       <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('send_test') ? 'active' : '' }}" href="{{ route('send_test') }}">
           <i class="far fa-paper-plane"></i><span>Send Test Mail</span>
         </a>
       </li>
+      @endcan
       <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('edit_profile') ? 'active' : '' }}" href="{{ route('edit_profile') }}">
           <i class="fas fa-user-cog"></i><span>Account</span>

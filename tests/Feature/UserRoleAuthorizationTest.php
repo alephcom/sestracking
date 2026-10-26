@@ -90,10 +90,11 @@ class UserRoleAuthorizationTest extends TestCase
         $response = $this->get('/activity');
         $response->assertOk();
 
+        // Test mail is restricted to super admins
         $response = $this->get('/send_test');
-        $response->assertOk();
+        $response->assertForbidden();
 
-        $response = $this->get('/logout');
+        $response = $this->post('/logout');
         $response->assertRedirect('/login');
     }
 

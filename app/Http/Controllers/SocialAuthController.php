@@ -35,8 +35,13 @@ class SocialAuthController extends Controller
             ->where('provider_id', $socialUser->getId())
             ->first();
 
+        // Matching by email is only safe when the provider vouches for the address;
+        // otherwise anyone who can set an arbitrary email on their IdP account could
+        // take over the local account with that email.
+        $emailTrusted = $socialUser->getEmail() && $this->providerVouchesForEmail($provider, $socialUser);
+
         // Link to existing account by email if SSO columns not set yet
-        if (! $user && $socialUser->getEmail()) {
+        if (! $user && $emailTrusted) {
             $user = User::where('email', $socialUser->getEmail())->first();
 
             if ($user) {
@@ -50,7 +55,7 @@ class SocialAuthController extends Controller
 
         // Create a new account for first-time SSO users (only when auto-registration is enabled)
         if (! $user) {
-            if (! config('auth.socialite_auto_create_users', false)) {
+            if (! config('auth.socialite_auto_create_users', false) || ! $emailTrusted) {
                 return redirect()->route('login')->withErrors([
                     'email' => 'No account exists for this email address. Please contact an administrator.',
                 ]);
@@ -67,7 +72,28 @@ class SocialAuthController extends Controller
         }
 
         Auth::login($user, remember: true);
+        request()->session()->regenerate();
 
         return redirect()->intended(route('dashboard.index'));
+    }
+
+    /**
+     * Whether the provider guarantees the user controls the email it returned.
+     *
+     * Google reports email_verified. Microsoft does not, and in multi-tenant mode any
+     * tenant admin can set any email on an account, so only trust it when the app is
+     * locked to a single tenant (MICROSOFT_TENANT_ID set to a tenant ID or domain).
+     */
+    private function providerVouchesForEmail(string $provider, $socialUser): bool
+    {
+        return match ($provider) {
+            'google' => filter_var($socialUser->user['email_verified'] ?? false, FILTER_VALIDATE_BOOLEAN),
+            'microsoft' => ! in_array(
+                strtolower(trim((string) config('services.microsoft.tenant'))),
+                ['', 'common', 'organizations', 'consumers'],
+                true
+            ),
+            default => false,
+        };
     }
 }

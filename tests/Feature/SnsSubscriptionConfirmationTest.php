@@ -3,44 +3,34 @@
 namespace Tests\Feature;
 
 use App\Models\Project;
-use Aws\Sns\Message;
-use Aws\Sns\MessageValidator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Tests\Concerns\SignsSnsMessages;
 use Tests\TestCase;
 
 class SnsSubscriptionConfirmationTest extends TestCase
 {
     use RefreshDatabase;
-
-    private const CERT_URL = 'https://sns.us-east-1.amazonaws.com/SimpleNotificationService-test.pem';
+    use SignsSnsMessages;
 
     private const SUBSCRIBE_URL = 'https://sns.us-east-1.amazonaws.com/?Action=ConfirmSubscription&TopicArn=arn:aws:sns:us-east-1:123456789012:ses&Token=abc';
-
-    /** @var \OpenSSLAsymmetricKey */
-    private $privateKey;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         Project::factory()->create(['token' => 'test-token-123']);
+        $this->trustTestSnsCertificate();
 
-        // Self-signed key pair standing in for the AWS SNS signing certificate.
-        $this->privateKey = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
-        $csr = openssl_csr_new(['commonName' => 'sns.amazonaws.com'], $this->privateKey);
-        openssl_x509_export(openssl_csr_sign($csr, null, $this->privateKey, 1), $certificatePem);
-
-        $this->app->instance(MessageValidator::class, new MessageValidator(
-            fn (string $url) => $url === self::CERT_URL ? $certificatePem : false
-        ));
+        // Confirmations are verified even when notification checks are turned off.
+        config(['services.ses.webhook_verify_signatures' => false]);
 
         Http::fake();
     }
 
     private function signedConfirmation(array $overrides = []): array
     {
-        $payload = array_merge([
+        return $this->signSnsPayload(array_merge([
             'Type' => 'SubscriptionConfirmation',
             'MessageId' => 'test-message-id',
             'Token' => 'abc',
@@ -48,15 +38,7 @@ class SnsSubscriptionConfirmationTest extends TestCase
             'Message' => 'You have chosen to subscribe to the topic.',
             'SubscribeURL' => self::SUBSCRIBE_URL,
             'Timestamp' => '2026-10-26T12:00:00.000Z',
-            'SignatureVersion' => '2',
-            'SigningCertURL' => self::CERT_URL,
-        ], $overrides);
-
-        $stringToSign = (new MessageValidator)->getStringToSign(new Message($payload + ['Signature' => 'x']));
-        openssl_sign($stringToSign, $signature, $this->privateKey, OPENSSL_ALGO_SHA256);
-        $payload['Signature'] = base64_encode($signature);
-
-        return $payload;
+        ], $overrides));
     }
 
     /** @test */
@@ -113,6 +95,17 @@ class SnsSubscriptionConfirmationTest extends TestCase
         $response = $this->postJson('/webhook/test-token-123', $payload);
 
         $response->assertStatus(400);
+        Http::assertNothingSent();
+    }
+
+    /** @test */
+    public function confirmation_from_disallowed_topic_is_rejected()
+    {
+        config(['services.ses.webhook_allowed_topic_arns' => ['arn:aws:sns:*:999999999999:*']]);
+
+        $response = $this->postJson('/webhook/test-token-123', $this->signedConfirmation());
+
+        $response->assertStatus(403);
         Http::assertNothingSent();
     }
 

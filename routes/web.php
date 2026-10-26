@@ -17,19 +17,25 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('login', [AuthController::class, 'login'])->name('login');
-Route::post('login', [AuthController::class, 'login'])->name('login');
+Route::get('login', [AuthController::class, 'showLogin'])->name('login');
+Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');
 
 Route::get('forgot-password', [PasswordResetController::class, 'showForgotForm'])->name('password.request');
-Route::post('forgot-password', [PasswordResetController::class, 'sendResetLink'])->name('password.email');
+Route::post('forgot-password', [PasswordResetController::class, 'sendResetLink'])
+    ->middleware('throttle:password-reset')
+    ->name('password.email');
 Route::get('reset-password/{token}', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
-Route::post('reset-password', [PasswordResetController::class, 'reset'])->name('password.update');
+Route::post('reset-password', [PasswordResetController::class, 'reset'])
+    ->middleware('throttle:password-reset')
+    ->name('password.update');
 
 Route::post('webhook/{token}', App\Http\Controllers\SesWebhookController::class);
 
 // Invitation routes (public)
 Route::get('invitation/accept/{token}', [App\Http\Controllers\InvitationController::class, 'show'])->name('invitation.show');
-Route::post('invitation/accept', [App\Http\Controllers\InvitationController::class, 'accept'])->name('invitation.accept');
+Route::post('invitation/accept', [App\Http\Controllers\InvitationController::class, 'accept'])
+    ->middleware('throttle:password-reset')
+    ->name('invitation.accept');
 
 // SSO routes (public)
 Route::get('auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])
@@ -49,7 +55,7 @@ Route::middleware(['throttle:two-factor-challenge'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('logout', [AuthController::class, 'logout'])->name('logout');
+    Route::post('logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('two-factor/setup', [TwoFactorAuthenticationController::class, 'showSetup'])->name('two-factor.setup');
     Route::post('two-factor/setup', [TwoFactorAuthenticationController::class, 'confirmSetup'])
         ->middleware('throttle:two-factor-setup')
@@ -71,8 +77,10 @@ Route::group([
     Route::get('reports/senders', [App\Http\Controllers\ReportsController::class, 'sendersReport'])->name('reports.senders');
     Route::get('reports/bounced-recipients', [App\Http\Controllers\ReportsController::class, 'bouncedRecipientsReport'])->name('reports.bounced-recipients');
     Route::get('reports/unsubscribes', [App\Http\Controllers\ReportsController::class, 'unsubscribesReport'])->name('reports.unsubscribes');
-    Route::get('send_test', [SendTestController::class, 'index'])->name('send_test');
-    Route::post('send_test/send', [SendTestController::class, 'send'])->name('send_test.send');
+    Route::middleware(['can:send-test-email'])->group(function () {
+        Route::get('send_test', [SendTestController::class, 'index'])->name('send_test');
+        Route::post('send_test/send', [SendTestController::class, 'send'])->name('send_test.send');
+    });
     Route::get('edit_profile', [UserController::class, 'edit'])->name('edit_profile');
     Route::post('edit_profile', [UserController::class, 'update'])->name('edit_profile.update');
 

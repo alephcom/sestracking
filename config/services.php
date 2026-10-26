@@ -22,6 +22,22 @@ return [
         'key' => env('AWS_ACCESS_KEY_ID'),
         'secret' => env('AWS_SECRET_ACCESS_KEY'),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+
+        // Reject webhook notifications that are not signed by Amazon SNS.
+        // Subscription confirmations are always verified regardless of this flag.
+        'webhook_verify_signatures' => env('SES_WEBHOOK_VERIFY_SIGNATURES', true),
+
+        // Accept raw SES event JSON (not wrapped in an SNS envelope). These cannot be
+        // signature-checked, so they are only accepted when this is enabled.
+        'webhook_allow_direct_payloads' => env('SES_WEBHOOK_ALLOW_DIRECT_PAYLOADS', false),
+
+        // Optional comma-separated SNS TopicArn patterns (shell wildcards allowed), e.g.
+        // "arn:aws:sns:*:123456789012:*". When set, messages from other topics are rejected,
+        // so a leaked webhook URL cannot be subscribed to someone else's topic.
+        'webhook_allowed_topic_arns' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('SES_WEBHOOK_ALLOWED_TOPIC_ARNS', ''))
+        ))),
     ],
 
     'slack' => [

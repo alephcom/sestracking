@@ -40,7 +40,7 @@ class SendTestController extends Controller
         $mail = new SesMail(
                             subjectText: $request->subject,
                             fromEmail: $request->sendFrom,
-                            fromName: 'Aleph',
+                            fromName: (string) config('mail.from.name'),
                             data: ['message' => $request->message],
                             configurationSet: $request->configurationSet ?? ''
                         );
