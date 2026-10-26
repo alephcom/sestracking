@@ -73,7 +73,8 @@ Route::group([
     Route::get('reports/unsubscribes', [App\Http\Controllers\ReportsController::class, 'unsubscribesReport'])->name('reports.unsubscribes');
     Route::get('send_test', [SendTestController::class, 'index'])->name('send_test');
     Route::post('send_test/send', [SendTestController::class, 'send'])->name('send_test.send');
-    Route::any('edit_profile', [UserController::class, 'edit'])->name('edit_profile');
+    Route::get('edit_profile', [UserController::class, 'edit'])->name('edit_profile');
+    Route::post('edit_profile', [UserController::class, 'update'])->name('edit_profile.update');
 
     Route::get('two-factor/recovery-codes', [TwoFactorAuthenticationController::class, 'showRecoveryCodes'])
         ->name('two-factor.recovery-codes');

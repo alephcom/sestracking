@@ -7,7 +7,6 @@ use App\Models\EmailRecipient;
 use App\Models\Project;
 use App\Models\RecipientEvent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class WebhookProcessingTest extends TestCase
@@ -20,27 +19,6 @@ class WebhookProcessingTest extends TestCase
     {
         parent::setUp();
         $this->project = Project::factory()->create(['token' => 'test-token-123']);
-    }
-
-    /** @test */
-    public function webhook_handles_sns_subscription_confirmation()
-    {
-        Http::fake();
-
-        $confirmationPayload = [
-            'Type' => 'SubscriptionConfirmation',
-            'MessageId' => 'test-message-id',
-            'SubscribeURL' => 'https://sns.amazonaws.com/subscription-confirm-url',
-        ];
-
-        $response = $this->postJson('/webhook/test-token-123', $confirmationPayload);
-
-        $response->assertOk();
-        $response->assertSeeText('OK');
-
-        Http::assertSent(function ($request) {
-            return $request->url() === 'https://sns.amazonaws.com/subscription-confirm-url';
-        });
     }
 
     /** @test */

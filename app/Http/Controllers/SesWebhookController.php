@@ -8,6 +8,9 @@ use App\Models\Project;
 use App\Models\RecipientEvent;
 use App\Notifications\BounceRateAlert;
 use App\Services\SesWebhookSuppressionDispatcher;
+use Aws\Sns\Exception\InvalidSnsMessageException;
+use Aws\Sns\Message;
+use Aws\Sns\MessageValidator;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -23,8 +26,14 @@ use function Sentry\withScope;
 class SesWebhookController extends Controller
 {
     public function __construct(
-        private readonly SesWebhookSuppressionDispatcher $suppressionDispatcher
+        private readonly SesWebhookSuppressionDispatcher $suppressionDispatcher,
+        private readonly MessageValidator $snsMessageValidator
     ) {}
+
+    /**
+     * SNS subscribe/unsubscribe links always point at the regional SNS endpoint.
+     */
+    private const SNS_SUBSCRIBE_URL_PATTERN = '#^https://sns\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/#';
 
     /**
      * Map SES eventType (PascalCase or lowercase) to stored enum value.
@@ -65,15 +74,13 @@ class SesWebhookController extends Controller
             return response('Bad JSON', 400);
         }
 
-        /* 1️⃣  Handle SNS handshake */
-        if (($sns['Type'] ?? '') === 'SubscriptionConfirmation') {
-            Http::get($sns['SubscribeURL'] ?? '');
-
-            return response('OK');
-        }
-
-        /* 3️⃣  Your tenant - get project early for both formats */
+        /* 1️⃣  Your tenant - unknown tokens never trigger any outbound request */
         $project = Project::whereToken($token)->firstOrFail();
+
+        /* 2️⃣  Handle SNS handshake: only follow SubscribeURL from a genuine, AWS-signed message */
+        if (($sns['Type'] ?? '') === 'SubscriptionConfirmation') {
+            return $this->confirmSnsSubscription($sns, $token);
+        }
 
         // Detect if this is SNS-wrapped or direct SES notification
         $messageId = null;
@@ -282,6 +289,38 @@ class SesWebhookController extends Controller
         }
 
         $this->checkRateThresholdsAndNotify($project);
+
+        return response('OK');
+    }
+
+    /**
+     * Verify the SNS signature and SubscribeURL host before confirming the subscription.
+     * Without this, anyone could make the server fetch an arbitrary URL (SSRF).
+     */
+    private function confirmSnsSubscription(array $sns, string $token)
+    {
+        $subscribeUrl = $sns['SubscribeURL'] ?? '';
+
+        try {
+            $this->snsMessageValidator->validate(new Message($sns));
+        } catch (InvalidSnsMessageException|\InvalidArgumentException $e) {
+            Log::warning('Rejected SNS subscription confirmation: invalid signature', [
+                'token' => $token,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response('Invalid SNS signature', 403);
+        }
+
+        if (! is_string($subscribeUrl) || ! preg_match(self::SNS_SUBSCRIBE_URL_PATTERN, $subscribeUrl)) {
+            Log::warning('Rejected SNS subscription confirmation: unexpected SubscribeURL host', [
+                'token' => $token,
+            ]);
+
+            return response('Invalid SubscribeURL', 400);
+        }
+
+        Http::timeout(10)->get($subscribeUrl);
 
         return response('OK');
     }

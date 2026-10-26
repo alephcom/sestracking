@@ -72,12 +72,14 @@
           <span>Manage Projects</span>
         </a>
       </li>
+      @can('viewAny', App\Models\User::class)
       <li class="nav-item">
         <a class="nav-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}" data-tooltip="Manage Users">
           <i class="fas fa-users"></i>
           <span>Manage Users</span>
         </a>
       </li>
+      @endcan
     </ul>
     @endif
   </div>

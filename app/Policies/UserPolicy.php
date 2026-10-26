@@ -8,11 +8,13 @@ use Illuminate\Auth\Access\Response;
 class UserPolicy
 {
     /**
-     * Determine whether the user can view any models.
+     * User management is limited to super admins. Project admins manage
+     * membership through the project edit screen instead; letting them edit
+     * users here would allow granting themselves super_admin.
      */
     public function viewAny(User $user): bool
     {
-        return $user->isSuperAdmin() || $user->isAdminForAnyProject();
+        return $user->isSuperAdmin();
     }
 
     /**
@@ -20,7 +22,7 @@ class UserPolicy
      */
     public function view(User $user, User $model): bool
     {
-        return $user->isAdminForAnyProject();
+        return $user->isSuperAdmin();
     }
 
     /**
@@ -28,7 +30,7 @@ class UserPolicy
      */
     public function create(User $user): bool
     {
-        return $user->isAdminForAnyProject();
+        return $user->isSuperAdmin();
     }
 
     /**
@@ -36,7 +38,7 @@ class UserPolicy
      */
     public function update(User $user, User $model): bool
     {
-        return $user->isAdminForAnyProject();
+        return $user->isSuperAdmin();
     }
 
     /**
@@ -44,7 +46,7 @@ class UserPolicy
      */
     public function delete(User $user, User $model): bool
     {
-        return $user->isAdminForAnyProject() && $model->id !== 1;
+        return $user->isSuperAdmin() && $model->id !== 1;
     }
 
     /**

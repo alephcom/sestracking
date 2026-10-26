@@ -6,6 +6,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "aws/aws-php-sns-message-validator": "^1.9",
         "aws/aws-sdk-php": "^3.348",
         "bacon/bacon-qr-code": "^3.0",
         "box/spout": "^3.3",

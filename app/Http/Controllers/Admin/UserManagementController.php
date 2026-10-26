@@ -16,18 +16,24 @@ class UserManagementController extends Controller
 {
     public function index()
     {
+        $this->authorize('viewAny', User::class);
+
         $users = User::with('projects')->orderBy('id')->get();
         return view('admin.users.index', compact('users'));
     }
 
     public function create()
     {
+        $this->authorize('create', User::class);
+
         $projects = Project::all();
         return view('admin.users.create', compact('projects'));
     }
 
     public function store(Request $request)
     {
+        $this->authorize('create', User::class);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -64,12 +70,16 @@ class UserManagementController extends Controller
 
     public function show(User $user)
     {
+        $this->authorize('view', $user);
+
         $user->load('projects');
         return view('admin.users.show', compact('user'));
     }
 
     public function edit(User $user)
     {
+        $this->authorize('update', $user);
+
         $projects = Project::all();
         $assignedProjects = $user->projects->pluck('id')->toArray();
         $projectRoles = $user->projects->mapWithKeys(function ($project) {
@@ -81,6 +91,8 @@ class UserManagementController extends Controller
 
     public function update(Request $request, User $user)
     {
+        $this->authorize('update', $user);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
@@ -128,6 +140,8 @@ class UserManagementController extends Controller
 
     public function destroy(User $user)
     {
+        $this->authorize('delete', $user);
+
         // Protect user ID=1 from deletion
         if ($user->id === 1) {
             return redirect()->route('admin.users.index')
@@ -151,6 +165,8 @@ class UserManagementController extends Controller
      */
     public function invite(Request $request)
     {
+        $this->authorize('create', User::class);
+
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
