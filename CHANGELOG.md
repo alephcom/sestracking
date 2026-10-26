@@ -26,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Activity export now uses the same query as the on-screen list: status and destination come from recipients, dates filter on `sent_at`, and the event-type filter no longer queries the removed `email_events` table. Rows are streamed in batches instead of loaded into memory at once
 - Invalid `dateFrom` / `dateTo` on the activity list and export return a validation error instead of a server error
+- Webhook payloads missing or mangling fields the handler relies on (`mail`, `mail.messageId`, `mail.source`, timestamps, recipient lists, or a recipient for opens/clicks) return a 400 with the reason instead of a 500. Unsupported SES event types are acknowledged and ignored so SNS stops retrying them
+- Send Test Mail's `X-SES-CONFIGURATION-SET` header is applied again: `SesMail` used SwiftMailer's `withSwiftMessage`, which Laravel 11 silently ignored. Now uses `withSymfonyMessage`; the unused `swiftmailer/swiftmailer` dependency is removed
 - Open and click counters no longer increase when SNS retries a notification, including on emails with several recipients (where the retry used to be stored against the next recipient)
 
 ### Performance

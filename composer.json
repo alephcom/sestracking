@@ -15,8 +15,7 @@
         "laravel/tinker": "^2.9",
         "pragmarx/google2fa": "^9.0",
         "sentry/sentry-laravel": "^4.21",
-        "socialiteproviders/microsoft": "^4.8",
-        "swiftmailer/swiftmailer": "^5.4"
+        "socialiteproviders/microsoft": "^4.8"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

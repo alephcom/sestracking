@@ -8,7 +8,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
-use Swift_Message;
+use Symfony\Component\Mime\Email;
 
 class SesMail extends Mailable
 {
@@ -47,8 +47,11 @@ class SesMail extends Mailable
             ->subject(subject: $this->subjectText)
             ->view(view: 'mail.sesmail')
             ->with(key: 'data', value: $this->data)
-            ->withSwiftMessage(function (Swift_Message $message) use ($configurationSet) {
-                if($configurationSet){$message->getHeaders()->addTextHeader('X-SES-CONFIGURATION-SET', $configurationSet);}
+            ->withSymfonyMessage(function (Email $message) use ($configurationSet) {
+                // SES reads the configuration set from this header on raw sends.
+                if ($configurationSet) {
+                    $message->getHeaders()->addTextHeader('X-SES-CONFIGURATION-SET', $configurationSet);
+                }
             });
     }
 

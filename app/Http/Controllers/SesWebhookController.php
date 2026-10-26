@@ -62,7 +62,7 @@ class SesWebhookController extends Controller
         }
 
         $sns = json_decode($request->getContent(), true);
-        if (! $sns) {
+        if (! is_array($sns) || $sns === []) {
             if (config('sentry.dsn')) {
                 withScope(function (\Sentry\State\Scope $scope) use ($request, $token): void {
                     $scope->setTag('webhook.token', $token);
@@ -121,8 +121,8 @@ class SesWebhookController extends Controller
                 return response('Missing Message', 400);
             }
 
-            $ses = json_decode($message, true);
-            if (! $ses) {
+            $ses = is_string($message) ? json_decode($message, true) : null;
+            if (! is_array($ses) || $ses === []) {
                 Log::warning('SNS Message field contains invalid JSON', ['message_id' => $messageId, 'message' => $message]);
                 if (config('sentry.dsn')) {
                     withScope(function (\Sentry\State\Scope $scope) use ($messageId, $token): void {
@@ -136,7 +136,7 @@ class SesWebhookController extends Controller
             }
         }
         // Check if this is a direct SES notification (has eventType or notificationType, and mail)
-        elseif (isset($sns['mail']) && (isset($sns['eventType']) || isset($sns['notificationType']))) {
+        elseif (is_array($sns['mail'] ?? null) && (isset($sns['eventType']) || isset($sns['notificationType']))) {
             // Direct SES format: treat the payload as the SES notification directly
             $ses = $sns;
 
@@ -144,11 +144,13 @@ class SesWebhookController extends Controller
             $sesMessageId = $ses['mail']['messageId'] ?? null;
             $timestamp = $ses['mail']['timestamp'] ?? now()->toIso8601String();
             $eventType = $ses['eventType'] ?? $ses['notificationType'] ?? 'unknown';
+            $eventType = is_string($eventType) ? $eventType : 'unknown';
             $payloadKey = lcfirst($eventType); // SES uses camelCase keys (e.g. deliveryDelay, renderingFailure)
+            $eventTimestamp = $ses[$payloadKey]['timestamp'] ?? $timestamp;
 
-            if ($sesMessageId) {
+            if (is_string($sesMessageId) && $sesMessageId !== '' && is_scalar($eventTimestamp)) {
                 // Create a unique ID combining messageId, eventType, and timestamp for deduplication
-                $messageId = 'ses-'.md5($sesMessageId.'-'.$eventType.'-'.($ses[$payloadKey]['timestamp'] ?? $timestamp));
+                $messageId = 'ses-'.md5($sesMessageId.'-'.$eventType.'-'.$eventTimestamp);
             } else {
                 // Fallback: generate from payload hash
                 $messageId = 'ses-'.md5(json_encode($ses));
@@ -170,6 +172,24 @@ class SesWebhookController extends Controller
             return response('Unknown payload format', 400);
         }
 
+        /* 5️⃣  Which event and which recipients? */
+        $rawEventType = $ses['eventType'] ?? $ses['notificationType'] ?? 'unknown';
+        $rawEventType = is_string($rawEventType) ? $rawEventType : 'unknown';
+        $type = self::SES_EVENT_TYPE_TO_ENUM[$rawEventType] ?? self::SES_EVENT_TYPE_TO_ENUM[strtolower($rawEventType)] ?? 'unknown';
+        $payloadKey = lcfirst($rawEventType); // SES payload uses camelCase (e.g. deliveryDelay, renderingFailure)
+
+        if ($type === 'unknown') {
+            // 2xx so SNS does not keep retrying event types this app does not store.
+            Log::info('Ignoring unsupported SES event type', ['token' => $token, 'event_type' => $rawEventType]);
+
+            return response('Ignored unsupported event type');
+        }
+
+        /* Reject payloads missing fields we rely on with a 400 instead of failing with a 500 */
+        if ($reason = $this->invalidSesPayloadReason($ses, $type, $payloadKey)) {
+            return $this->rejectInvalidPayload($token, $messageId, $reason);
+        }
+
         $email = Email::firstOrCreate(
             ['project_id' => $project->id, 'message_id' => $ses['mail']['messageId']],
             [
@@ -179,18 +199,16 @@ class SesWebhookController extends Controller
             ]
         );
 
-        /* 5️⃣  Which event and which recipients? */
-        $rawEventType = $ses['eventType'] ?? $ses['notificationType'] ?? 'unknown';
-        $type = self::SES_EVENT_TYPE_TO_ENUM[$rawEventType] ?? self::SES_EVENT_TYPE_TO_ENUM[strtolower($rawEventType)] ?? 'unknown';
-        $payloadKey = lcfirst($rawEventType); // SES payload uses camelCase (e.g. deliveryDelay, renderingFailure)
-
         // Special handling for open/click events - assign to first available recipient
         if (in_array($type, ['open', 'click'])) {
             // Ensure all recipients exist first
             $recipientAddresses = $ses['delivery']['recipients'] ?? $ses['mail']['destination'];
             foreach ($recipientAddresses as $address) {
+                if (! is_string($address) || trim($address) === '') {
+                    continue;
+                }
                 EmailRecipient::firstOrCreate(
-                    ['email_id' => $email->id, 'address' => strtolower($address)]
+                    ['email_id' => $email->id, 'address' => strtolower(trim($address))]
                 );
             }
 
@@ -257,6 +275,10 @@ class SesWebhookController extends Controller
             }
 
             foreach ($recipientAddresses as $address) {
+                if (! is_string($address)) {
+                    continue;
+                }
+
                 // Clean up the address (remove whitespace, convert to lowercase)
                 $cleanAddress = strtolower(trim($address));
                 if (empty($cleanAddress)) {
@@ -343,6 +365,82 @@ class SesWebhookController extends Controller
         Http::timeout(10)->get($subscribeUrl);
 
         return response('OK');
+    }
+
+    /**
+     * Fields the handler below reads without further checks. Returns a reason when one is
+     * missing or malformed, or null when the payload is usable.
+     */
+    private function invalidSesPayloadReason(array $ses, string $type, string $payloadKey): ?string
+    {
+        $mail = $ses['mail'] ?? null;
+        if (! is_array($mail)) {
+            return 'mail object missing';
+        }
+
+        if (! is_string($mail['messageId'] ?? null) || trim($mail['messageId']) === '') {
+            return 'mail.messageId missing';
+        }
+
+        if (! is_string($mail['source'] ?? null)) {
+            return 'mail.source missing';
+        }
+
+        if (! $this->isParsableTimestamp($mail['timestamp'] ?? null)) {
+            return 'mail.timestamp missing or invalid';
+        }
+
+        if (isset($ses[$payloadKey]['timestamp']) && ! $this->isParsableTimestamp($ses[$payloadKey]['timestamp'])) {
+            return $payloadKey.'.timestamp invalid';
+        }
+
+        foreach (['mail.destination', 'delivery.recipients', 'bounce.bouncedRecipients',
+            'complaint.complainedRecipients', 'deliveryDelay.delayedRecipients', 'subscription.endpoints'] as $path) {
+            [$section, $field] = explode('.', $path);
+            if (isset($ses[$section][$field]) && ! is_array($ses[$section][$field])) {
+                return $path.' must be a list';
+            }
+        }
+
+        // Opens and clicks are attributed to one of the message's recipients, so there must be one.
+        if (in_array($type, ['open', 'click'], true)) {
+            $addresses = $ses['delivery']['recipients'] ?? $mail['destination'] ?? [];
+            $hasAddress = collect($addresses)->contains(fn ($a) => is_string($a) && trim($a) !== '');
+            if (! $hasAddress) {
+                return 'no recipient address for '.$type.' event';
+            }
+        }
+
+        return null;
+    }
+
+    private function isParsableTimestamp(mixed $value): bool
+    {
+        if (! is_string($value) || trim($value) === '') {
+            return false;
+        }
+
+        try {
+            Carbon::parse($value);
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function rejectInvalidPayload(string $token, ?string $messageId, string $reason)
+    {
+        Log::warning('Invalid SES webhook payload', ['token' => $token, 'message_id' => $messageId, 'reason' => $reason]);
+        if (config('sentry.dsn')) {
+            withScope(function (\Sentry\State\Scope $scope) use ($token, $messageId, $reason): void {
+                $scope->setTag('webhook.token', $token);
+                $scope->setContext('webhook', ['message_id' => $messageId, 'reason' => $reason]);
+                captureMessage('Invalid SES webhook: '.$reason, \Sentry\Severity::warning());
+            });
+        }
+
+        return response('Invalid SES payload: '.$reason, 400);
     }
 
     /**
