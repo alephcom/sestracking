@@ -64,7 +64,7 @@ return [
     |
     */
 
-    'webhook_rate_limit' => (int) env('WEBHOOK_RATE_LIMIT', 200),
+    'webhook_rate_limit' => (int) env('WEBHOOK_RATE_LIMIT', 1000),
 
     /*
     |--------------------------------------------------------------------------
