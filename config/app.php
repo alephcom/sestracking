@@ -56,6 +56,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Webhook Rate Limit
+    |--------------------------------------------------------------------------
+    |
+    | Maximum webhook requests per minute from a single IP address. Requests
+    | over the limit receive 429 Too Many Requests. Set to 0 to disable.
+    |
+    */
+
+    'webhook_rate_limit' => (int) env('WEBHOOK_RATE_LIMIT', 1000),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application URL
     |--------------------------------------------------------------------------
     |
