@@ -28,9 +28,10 @@ class ActivityApp {
       { value: 'reject',    text: 'Reject' },
       { value: 'bounce',    text: 'Bounce' },
       { value: 'complaint', text: 'Complaint' },
-      { value: 'failure',   text: 'Failure' },
+      { value: 'rendering_failure', text: 'Failure' },
       { value: 'open',      text: 'Open' },
       { value: 'click',     text: 'Click' },
+      { value: 'bounce,complaint,reject,rendering_failure', text: 'Not Delivered' },
     ];
 
     this.init();
@@ -39,6 +40,7 @@ class ActivityApp {
   init() {
     this.createDOM();
     this.setupFilters();
+    this.applyUrlFilters();
     this.setupModal();
     window.activityVueInstance = this;
     this.loadData();
@@ -201,6 +203,37 @@ class ActivityApp {
     }
     if (exportCsv) {
       exportCsv.addEventListener('click', (e) => { e.preventDefault(); window.location.href = this.getExportUrl('csv'); });
+    }
+  }
+
+  // Pre-fill filters from the query string, e.g. when arriving from a dashboard card
+  applyUrlFilters() {
+    const params = new URLSearchParams(window.location.search);
+
+    const eventType = params.get('eventType');
+    if (eventType && this.eventOptions.some(opt => opt.value === eventType)) {
+      this.eventSelected = eventType;
+      const eventSelect = document.getElementById('event-select');
+      if (eventSelect) eventSelect.value = eventType;
+    }
+
+    const dateFrom = params.get('dateFrom');
+    const dateTo   = params.get('dateTo');
+    if (dateFrom && dateTo && moment(dateFrom, 'YYYY-MM-DD', true).isValid() && moment(dateTo, 'YYYY-MM-DD', true).isValid()) {
+      this.dateFrom = moment(dateFrom).startOf('day').toDate();
+      this.dateTo   = moment(dateTo).endOf('day').toDate();
+      const dateFromInput = document.getElementById('activity-date-from');
+      const dateToInput   = document.getElementById('activity-date-to');
+      if (dateFromInput) dateFromInput.value = dateFrom;
+      if (dateToInput)   dateToInput.value   = dateTo;
+    }
+
+    const project = params.get('project');
+    if (project && (window.accessibleProjects || []).map(String).includes(project)) {
+      this.currentProjectId = project;
+      window.dashboardProjectId = project;
+      const projectSelector = document.getElementById('project_selector');
+      if (projectSelector) projectSelector.value = project;
     }
   }
 

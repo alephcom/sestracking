@@ -53,8 +53,8 @@ class ActivityController extends Controller
             $filters['search'] = $request->get('search');
         }
 
-        if ($request->get('eventType')) {
-            $filters['eventType'] = $request->get('eventType');
+        if ($eventTypes = $this->parseEventTypes($request)) {
+            $filters['eventTypes'] = $eventTypes;
         }
 
         if ($dateFrom = $request->get('dateFrom')) {
@@ -80,15 +80,8 @@ class ActivityController extends Controller
             $email->whereBetween('sent_at', [$filters['dateFrom'], $filters['dateTo']]);
         }
 
-        if (!empty($filters['eventType'])) {
-            // whereIn subquery is more efficient than whereHas (avoids nested EXISTS
-            // traversing the hasManyThrough relationship chain)
-            $email->whereIn('emails.id', function ($query) use ($filters) {
-                $query->select('er.email_id')
-                    ->from('email_recipients as er')
-                    ->join('recipient_events as re', 'er.id', '=', 're.recipient_id')
-                    ->where('re.type', $filters['eventType']);
-            });
+        if (!empty($filters['eventTypes'])) {
+            $this->applyEventTypeFilter($email, $filters['eventTypes']);
         }
 
         $results = $email->orderBy('sent_at','desc')->paginate(10);
@@ -168,8 +161,8 @@ class ActivityController extends Controller
             $filters['search'] = $request->get('search');
         }
 
-        if ($request->get('eventType')) {
-            $filters['eventType'] = $request->get('eventType');
+        if ($eventTypes = $this->parseEventTypes($request)) {
+            $filters['eventTypes'] = $eventTypes;
         }
 
         if ($dateFrom = $request->get('dateFrom')) {
@@ -203,11 +196,9 @@ class ActivityController extends Controller
             $emails->whereBetween('emails.created_at', [$filters['dateFrom'], $filters['dateTo']]);
         }
 
-        if (!empty($filters['eventType'])) {
-            $emails->leftJoin('email_events','emails.id','=','email_events.email_id')
-            ->where('email_events.event_type', $filters['eventType'])
-                  ->select('emails.*');
-        } 
+        if (!empty($filters['eventTypes'])) {
+            $this->applyEventTypeFilter($emails, $filters['eventTypes']);
+        }
 
 
         $emails = $emails->get();
@@ -261,6 +252,35 @@ class ActivityController extends Controller
         }
 
         return $response;
+    }
+
+    /**
+     * Parse the eventType filter, which may be a single type or a
+     * comma-separated list (e.g. "bounce,complaint" from the dashboard).
+     */
+    private function parseEventTypes(Request $request): array
+    {
+        $eventType = $request->get('eventType');
+        if (!is_string($eventType) || $eventType === '') {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map('trim', explode(',', $eventType)))));
+    }
+
+    /**
+     * Limit an email query to emails with at least one event of the given types.
+     */
+    private function applyEventTypeFilter($query, array $eventTypes): void
+    {
+        // whereIn subquery is more efficient than whereHas (avoids nested EXISTS
+        // traversing the hasManyThrough relationship chain)
+        $query->whereIn('emails.id', function ($subquery) use ($eventTypes) {
+            $subquery->select('er.email_id')
+                ->from('email_recipients as er')
+                ->join('recipient_events as re', 'er.id', '=', 're.recipient_id')
+                ->whereIn('re.type', $eventTypes);
+        });
     }
 
     private function getEmailStatus($email)

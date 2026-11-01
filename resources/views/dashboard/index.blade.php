@@ -67,6 +67,7 @@
 @section('scripts')
   <script>
     window.dashboardEndpoint = '{{ route('dashboard.api') }}';
+    window.activityUrl = '{{ route('activity') }}';
     window.dashboardProjectId = 'all';
     window.accessibleProjects = @json($accessibleProjects->pluck('id')->toArray());
 

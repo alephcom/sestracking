@@ -634,11 +634,22 @@ kbd {
 }
 
 /*
- * Stat cards — no hover lift (they're purely informational)
+ * Stat cards — no hover lift unless they link somewhere
  */
 .row.g-3 .card {
   &:hover {
     transform: none;
+  }
+}
+
+.row.g-3 a.card.stat-card-link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    transform: translateY(-2px);
   }
 }
 

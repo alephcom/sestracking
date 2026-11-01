@@ -4,6 +4,9 @@ import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 import './bootstrap';
 
+// Event types that make up the "Not Delivered" counter (see DashboardController)
+const NOT_DELIVERED_TYPES = 'bounce,complaint,reject,rendering_failure';
+
 class DashboardApp {
   constructor() {
     this.projectId = window.dashboardProjectId || 'all';
@@ -165,6 +168,19 @@ class DashboardApp {
     return `<span class="badge ${bg}">${label}</span>`;
   }
 
+  activityLink(eventType) {
+    const params = new URLSearchParams({
+      eventType,
+      dateFrom: moment(this.dateRange.startDate).format('YYYY-MM-DD'),
+      dateTo:   moment(this.dateRange.endDate).format('YYYY-MM-DD'),
+    });
+    // The activity page filters by a single project, so only pass one through
+    if (this.projectId && this.projectId !== 'all' && !String(this.projectId).includes(',')) {
+      params.set('project', this.projectId);
+    }
+    return `${window.activityUrl}?${params.toString()}`;
+  }
+
   renderCounters() {
     const countersContainer = document.getElementById('counters-cards');
     if (!countersContainer) return;
@@ -185,77 +201,77 @@ class DashboardApp {
     countersContainer.innerHTML = `
       <div class="row g-3 mb-5">
         <div class="col-6 col-md">
-          <div class="card text-center h-100">
+          <a href="${this.activityLink('send')}" class="card text-center h-100 stat-card-link" title="View sent emails">
             <div class="card-body py-4">
               <i class="fas fa-envelope fa-2x text-secondary mb-3"></i>
               <div class="text-uppercase text-muted small fw-semibold mb-1">Sent</div>
               <div class="fs-3 fw-bold text-dark">${fmt(sent)}</div>
             </div>
-          </div>
+          </a>
         </div>
 
         <div class="col-6 col-md">
-          <div class="card text-center h-100">
+          <a href="${this.activityLink('delivery')}" class="card text-center h-100 stat-card-link" title="View delivered emails">
             <div class="card-body py-4">
               <i class="fas fa-check-circle fa-2x text-success mb-3"></i>
               <div class="text-uppercase text-muted small fw-semibold mb-1">Delivered</div>
               <div class="fs-3 fw-bold text-success">${fmt(delivered)}</div>
               <div class="text-muted small">${fmt(deliveredPercent)}%</div>
             </div>
-          </div>
+          </a>
         </div>
 
         <div class="col-6 col-md">
-          <div class="card text-center h-100">
+          <a href="${this.activityLink('open')}" class="card text-center h-100 stat-card-link" title="View opened emails">
             <div class="card-body py-4">
               <i class="fas fa-eye fa-2x text-primary mb-3"></i>
               <div class="text-uppercase text-muted small fw-semibold mb-1">Opens</div>
               <div class="fs-3 fw-bold text-primary">${fmt(opens)}</div>
             </div>
-          </div>
+          </a>
         </div>
 
         <div class="col-6 col-md">
-          <div class="card text-center h-100">
+          <a href="${this.activityLink('click')}" class="card text-center h-100 stat-card-link" title="View clicked emails">
             <div class="card-body py-4">
               <i class="fas fa-mouse-pointer fa-2x mb-3" style="color: #8b5cf6;"></i>
               <div class="text-uppercase text-muted small fw-semibold mb-1">Clicks</div>
               <div class="fs-3 fw-bold" style="color: #8b5cf6;">${fmt(clicks)}</div>
             </div>
-          </div>
+          </a>
         </div>
 
         <div class="col-6 col-md">
-          <div class="card text-center h-100">
+          <a href="${this.activityLink(NOT_DELIVERED_TYPES)}" class="card text-center h-100 stat-card-link" title="View emails that were not delivered">
             <div class="card-body py-4">
               <i class="fas fa-exclamation-circle fa-2x text-danger mb-3"></i>
               <div class="text-uppercase text-muted small fw-semibold mb-1">Not Delivered</div>
               <div class="fs-3 fw-bold text-danger">${fmt(notDelivered)}</div>
               <div class="text-muted small">${fmt(notDeliveredPercent)}%</div>
             </div>
-          </div>
+          </a>
         </div>
 
         <div class="col-6 col-md">
-          <div class="card text-center h-100">
+          <a href="${this.activityLink('bounce')}" class="card text-center h-100 stat-card-link" title="View bounced emails">
             <div class="card-body py-4">
               <i class="fas fa-undo fa-2x text-warning mb-3"></i>
               <div class="text-uppercase text-muted small fw-semibold mb-1">Bounced</div>
               <div class="fs-3 fw-bold text-warning">${fmt(bounce)}</div>
               <div class="mt-2">${this.getBounceRateBadge()}</div>
             </div>
-          </div>
+          </a>
         </div>
 
         <div class="col-6 col-md">
-          <div class="card text-center h-100">
+          <a href="${this.activityLink('complaint')}" class="card text-center h-100 stat-card-link" title="View emails with complaints">
             <div class="card-body py-4">
               <i class="fas fa-flag fa-2x text-danger mb-3"></i>
               <div class="text-uppercase text-muted small fw-semibold mb-1">Complaint</div>
               <div class="fs-3 fw-bold text-danger">${fmt(complaint)}</div>
               <div class="mt-2">${this.getComplaintRateBadge()}</div>
             </div>
-          </div>
+          </a>
         </div>
       </div>
     `;
