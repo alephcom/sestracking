@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
             'two-factor.enrolled' => \App\Http\Middleware\EnsureTwoFactorIsEnrolled::class,
+            'sns.signature' => \App\Http\Middleware\ValidateSnsSignature::class,
         ]);
 
     })

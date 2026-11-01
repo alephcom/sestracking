@@ -200,6 +200,14 @@ POST https://<your-domain.com>/webhook/{project_token}
 
 Each project has a unique token for webhook authentication.
 
+### Signature verification
+
+Every webhook request must be signed by Amazon SNS. The app checks the signature against AWS's signing certificate (downloaded from `sns.<region>.amazonaws.com` and cached for a day) and rejects anything else with `403`, so events can't simply be posted to the URL by hand. Your server needs outbound HTTPS access to `sns.*.amazonaws.com`.
+
+The signature proves a message came through Amazon SNS, not which SNS topic sent it, so still treat the webhook URL as a secret.
+
+If a project posts SES events to the webhook **directly, without SNS**, those requests carry no signature. A project admin can allow them under **Manage Projects → Edit → Webhook security → Accept webhook requests that are not signed by Amazon SNS**. Only turn this on when you need it: anyone who knows that project's webhook URL could then send fake events.
+
 ### Queue worker (required)
 
 The webhook only checks each notification and puts it on a queue, then answers SNS straight away. A queue worker does the actual saving, so **events will not show up on the dashboard unless a worker is running**. With the default `QUEUE_CONNECTION=database`:

@@ -26,7 +26,7 @@ Route::get('reset-password/{token}', [PasswordResetController::class, 'showReset
 Route::post('reset-password', [PasswordResetController::class, 'reset'])->name('password.update');
 
 Route::post('webhook/{token}', App\Http\Controllers\SesWebhookController::class)
-    ->middleware('throttle:webhook');
+    ->middleware(['throttle:webhook', 'sns.signature']);
 
 // Invitation routes (public)
 Route::get('invitation/accept/{token}', [App\Http\Controllers\InvitationController::class, 'show'])->name('invitation.show');

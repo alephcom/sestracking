@@ -27,6 +27,7 @@ class Project extends Model
         'ses_aws_access_key_id',
         'ses_aws_secret_access_key',
         'ses_aws_default_region',
+        'allow_unsigned_webhooks',
     ];
 
     protected $casts = [
@@ -37,6 +38,7 @@ class Project extends Model
         'ses_suppression_push_soft_bounces' => 'boolean',
         'ses_aws_secret_access_key' => 'encrypted',
         'ses_suppression_list_synced_at' => 'datetime',
+        'allow_unsigned_webhooks' => 'boolean',
     ];
 
     /**

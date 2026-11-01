@@ -21,7 +21,7 @@ class WebhookRateAlertTest extends TestCase
     {
         Notification::fake();
 
-        $project = Project::factory()->create(['token' => 'rate-alert-token']);
+        $project = Project::factory()->allowingUnsignedWebhooks()->create(['token' => 'rate-alert-token']);
         $admin = User::factory()->create();
         $project->users()->attach($admin, ['role' => 'admin']);
 
@@ -79,7 +79,7 @@ class WebhookRateAlertTest extends TestCase
     {
         Notification::fake();
 
-        $project = Project::factory()->create(['token' => 'rate-alert-token-2']);
+        $project = Project::factory()->allowingUnsignedWebhooks()->create(['token' => 'rate-alert-token-2']);
         $admin = User::factory()->create();
         $project->users()->attach($admin, ['role' => 'admin']);
 
@@ -133,7 +133,7 @@ class WebhookRateAlertTest extends TestCase
     {
         Notification::fake();
 
-        $project = Project::factory()->create([
+        $project = Project::factory()->allowingUnsignedWebhooks()->create([
             'token' => 'rate-alert-token-3',
             'alert_bounce_rate' => 2.5,
         ]);
@@ -192,7 +192,7 @@ class WebhookRateAlertTest extends TestCase
     {
         Notification::fake();
 
-        $project = Project::factory()->create(['token' => 'rate-alert-token-4']);
+        $project = Project::factory()->allowingUnsignedWebhooks()->create(['token' => 'rate-alert-token-4']);
         $admin = User::factory()->create();
         $project->users()->attach($admin, ['role' => 'admin']);
 
@@ -250,7 +250,7 @@ class WebhookRateAlertTest extends TestCase
     {
         Notification::fake();
 
-        $project = Project::factory()->create(['token' => 'rate-alert-token-5']);
+        $project = Project::factory()->allowingUnsignedWebhooks()->create(['token' => 'rate-alert-token-5']);
         $admin = User::factory()->create();
         $project->users()->attach($admin, ['role' => 'admin']);
 

@@ -19,7 +19,7 @@ class WebhookProcessingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->project = Project::factory()->create(['token' => 'test-token-123']);
+        $this->project = Project::factory()->allowingUnsignedWebhooks()->create(['token' => 'test-token-123']);
     }
 
     /** @test */
