@@ -31,7 +31,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
     /** @test */
     public function webhook_dispatches_suppression_job_for_hard_bounce_when_auto_push_enabled(): void
     {
-        Bus::fake();
+        Bus::fake([PushSuppressedDestinationJob::class]);
 
         $payload = $this->wrapSns('bounce', [
             'mail' => [
@@ -67,7 +67,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
             'ses_aws_secret_access_key' => null,
             'ses_aws_default_region' => null,
         ]);
-        Bus::fake();
+        Bus::fake([PushSuppressedDestinationJob::class]);
 
         $payload = $this->wrapSns('bounce', [
             'mail' => [
@@ -95,7 +95,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
     public function webhook_does_not_dispatch_when_auto_push_disabled(): void
     {
         $this->project->update(['ses_suppression_auto_push_enabled' => false]);
-        Bus::fake();
+        Bus::fake([PushSuppressedDestinationJob::class]);
 
         $payload = $this->wrapSns('bounce', [
             'mail' => [
@@ -122,7 +122,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
     /** @test */
     public function webhook_does_not_dispatch_for_transient_bounce_when_soft_bounces_disabled(): void
     {
-        Bus::fake();
+        Bus::fake([PushSuppressedDestinationJob::class]);
 
         $payload = $this->wrapSns('bounce', [
             'mail' => [
@@ -150,7 +150,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
     public function webhook_dispatches_for_transient_bounce_when_soft_bounces_enabled(): void
     {
         $this->project->update(['ses_suppression_push_soft_bounces' => true]);
-        Bus::fake();
+        Bus::fake([PushSuppressedDestinationJob::class]);
 
         $payload = $this->wrapSns('bounce', [
             'mail' => [
@@ -179,7 +179,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
     /** @test */
     public function webhook_dispatches_complaint_job_when_push_complaints_enabled(): void
     {
-        Bus::fake();
+        Bus::fake([PushSuppressedDestinationJob::class]);
 
         $payload = $this->wrapSns('complaint', [
             'mail' => [
@@ -208,7 +208,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
     public function webhook_does_not_dispatch_complaint_when_push_complaints_disabled(): void
     {
         $this->project->update(['ses_suppression_push_complaints' => false]);
-        Bus::fake();
+        Bus::fake([PushSuppressedDestinationJob::class]);
 
         $payload = $this->wrapSns('complaint', [
             'mail' => [
@@ -234,7 +234,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
     /** @test */
     public function duplicate_webhook_does_not_dispatch_second_suppression_job(): void
     {
-        Bus::fake();
+        Bus::fake([PushSuppressedDestinationJob::class]);
 
         $payload = $this->wrapSns('bounce', [
             'mail' => [

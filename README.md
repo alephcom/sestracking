@@ -190,6 +190,18 @@ POST https://<your-domain.com>/webhook/{project_token}
 
 Each project has a unique token for webhook authentication.
 
+### Queue worker (required)
+
+The webhook only checks each notification and puts it on a queue, then answers SNS straight away. A queue worker does the actual saving, so **events will not show up on the dashboard unless a worker is running**. With the default `QUEUE_CONNECTION=database`:
+
+```bash
+php artisan queue:work --tries=3
+```
+
+In production, keep it running with a process manager such as Supervisor or systemd, and restart it after each deploy (`php artisan queue:restart`) so it picks up new code. Jobs that fail every attempt are kept in the `failed_jobs` table; see them with `php artisan queue:failed` and retry with `php artisan queue:retry all`.
+
+For local development you can set `QUEUE_CONNECTION=sync` to process webhooks immediately without a worker.
+
 ## TODO
 
 - [ ] Add more detailed documentation for setting up AWS SES and SNS
