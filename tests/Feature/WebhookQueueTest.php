@@ -6,6 +6,7 @@ use App\Jobs\ProcessSesWebhook;
 use App\Models\Email;
 use App\Models\Project;
 use App\Models\RecipientEvent;
+use App\Services\DashboardCache;
 use App\Services\SesWebhookSuppressionDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
@@ -99,7 +100,7 @@ class WebhookQueueTest extends TestCase
     {
         $job = new ProcessSesWebhook(999999, json_decode($this->snsPayload('Delivery')['Message'], true), 'sns-gone');
 
-        $job->handle(app(SesWebhookSuppressionDispatcher::class));
+        $job->handle(app(SesWebhookSuppressionDispatcher::class), app(DashboardCache::class));
 
         $this->assertSame(0, Email::count());
     }

@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Email;
+use App\Services\DashboardCache;
 use App\Services\DashboardChartAggregator;
 use App\Services\ProjectAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -24,7 +24,7 @@ class DashboardController extends Controller
     }
 
 
-    public function jsApi(Request $request, ProjectAccessService $projectService, DashboardChartAggregator $chartAggregator)
+    public function jsApi(Request $request, ProjectAccessService $projectService, DashboardChartAggregator $chartAggregator, DashboardCache $dashboardCache)
     {
         $user = auth()->user();
         $accessibleProjectIds = $projectService->getAccessibleProjectIds($user);
@@ -88,7 +88,7 @@ class DashboardController extends Controller
             $tzOffset
         );
 
-        $data = Cache::remember($cacheKey, 300, function () use ($selectedProjectIds, $dateFrom, $dateTo, $tzOffset, $chartAggregator) {
+        $data = $dashboardCache->remember($selectedProjectIds, $cacheKey, 300, function () use ($selectedProjectIds, $dateFrom, $dateTo, $tzOffset, $chartAggregator) {
             return $this->buildDashboardData($selectedProjectIds, $dateFrom, $dateTo, $tzOffset, $chartAggregator);
         });
 

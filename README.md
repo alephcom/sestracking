@@ -151,6 +151,16 @@ APP_URL=http://localhost:8000
 
 ```
 
+### Optional: Faster dashboard updates (cache)
+
+Dashboard figures are cached for up to 5 minutes. With a cache store that supports tags (Redis or Memcached), each new webhook event clears the cache for its project, so the dashboard shows new events on the next load:
+
+```env
+CACHE_STORE=redis
+```
+
+With the default `file` or `database` stores the dashboard still works, but can be up to 5 minutes behind.
+
 ### Optional: Webhook Debug Logging
 ```env
 # Enable webhook payload logging for debugging (disable in production)

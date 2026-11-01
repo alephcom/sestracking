@@ -7,6 +7,7 @@ use App\Models\EmailRecipient;
 use App\Models\Project;
 use App\Models\RecipientEvent;
 use App\Notifications\BounceRateAlert;
+use App\Services\DashboardCache;
 use App\Services\SesWebhookSuppressionDispatcher;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -63,7 +64,7 @@ class ProcessSesWebhook implements ShouldQueue
         public string $messageId,
     ) {}
 
-    public function handle(SesWebhookSuppressionDispatcher $suppressionDispatcher): void
+    public function handle(SesWebhookSuppressionDispatcher $suppressionDispatcher, DashboardCache $dashboardCache): void
     {
         $project = Project::find($this->projectId);
         if (! $project) {
@@ -208,6 +209,9 @@ class ProcessSesWebhook implements ShouldQueue
                 }
             }
         }
+
+        // New data for this project: let the dashboard pick it up on its next load
+        $dashboardCache->flushProject($project->id);
 
         $this->checkRateThresholdsAndNotify($project);
     }
