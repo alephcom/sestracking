@@ -46,5 +46,14 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(12)->by('2fa-setup:guest:'.$request->ip());
         });
+
+        RateLimiter::for('webhook', function (Request $request) {
+            $perMinute = (int) config('app.webhook_rate_limit');
+            if ($perMinute <= 0) {
+                return Limit::none();
+            }
+
+            return Limit::perMinute($perMinute)->by('webhook:'.$request->ip());
+        });
     }
 }
