@@ -213,6 +213,39 @@ class WebhookSnsSignatureTest extends TestCase
     }
 
     /** @test */
+    public function project_with_bypass_enabled_still_rejects_unsigned_subscription_confirmations(): void
+    {
+        Project::factory()->allowingUnsignedWebhooks()->create(['token' => 'unsigned-token']);
+
+        $this->postJson('/webhook/unsigned-token', [
+            'Type' => 'SubscriptionConfirmation',
+            'MessageId' => 'sub-forged',
+            'SubscribeURL' => 'http://169.254.169.254/latest/meta-data/',
+        ])->assertForbidden();
+
+        Http::assertNothingSent();
+    }
+
+    /** @test */
+    public function project_with_bypass_enabled_still_confirms_signed_subscriptions(): void
+    {
+        Project::factory()->allowingUnsignedWebhooks()->create(['token' => 'unsigned-token']);
+        $confirmation = $this->sign([
+            'Type' => 'SubscriptionConfirmation',
+            'MessageId' => 'sub-2',
+            'Token' => 'abc',
+            'TopicArn' => 'arn:aws:sns:us-east-1:123456789012:ses-events',
+            'Message' => 'You have chosen to subscribe to the topic.',
+            'SubscribeURL' => self::SUBSCRIBE_URL,
+            'Timestamp' => '2026-11-01T10:00:00.000Z',
+        ], '2', ['Message', 'MessageId', 'SubscribeURL', 'Timestamp', 'Token', 'TopicArn', 'Type']);
+
+        $this->postJson('/webhook/unsigned-token', $confirmation)->assertOk();
+
+        Http::assertSent(fn ($request) => $request->url() === self::SUBSCRIBE_URL);
+    }
+
+    /** @test */
     public function unknown_token_returns_404(): void
     {
         $this->postJson('/webhook/no-such-token', $this->sign($this->notification()))->assertNotFound();

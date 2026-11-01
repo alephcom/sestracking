@@ -30,11 +30,16 @@ class ValidateSnsSignature
             abort(404);
         }
 
-        if ($project->allow_unsigned_webhooks) {
+        $message = json_decode($request->getContent(), true);
+
+        // The bypass covers unsigned event payloads only. Subscription confirmations make the app
+        // visit their SubscribeURL, so they must always be signed (they only ever come from SNS).
+        $isConfirmation = is_array($message)
+            && in_array($message['Type'] ?? null, ['SubscriptionConfirmation', 'UnsubscribeConfirmation'], true);
+        if ($project->allow_unsigned_webhooks && ! $isConfirmation) {
             return $next($request);
         }
 
-        $message = json_decode($request->getContent(), true);
         if (is_array($message) && $this->validator->isValid($message)) {
             return $next($request);
         }
