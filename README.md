@@ -37,8 +37,8 @@ Overview of send, delivery, opens, clicks, and not-delivered metrics with projec
 ## Architecture
 
 - **Backend:** Laravel 11, PHP 8.2+, MySQL 8
-- **Frontend:** JavaScript with Bootstrap 5, Chart.js, and Vue (see `package.json` / Mix build for UI components)
-- **Build:** Laravel Mix
+- **Frontend:** JavaScript with Bootstrap 5 and Chart.js
+- **Build:** Vite (via `laravel-vite-plugin`)
 - **Email provider:** Amazon SES
 - **Ingest:** Amazon SNS notifications → Laravel webhook controllers (idempotent processing)
 
@@ -49,9 +49,9 @@ Overview of send, delivery, opens, clicks, and not-delivered metrics with projec
 - PHP 8.2+
 - MySQL 8.0+
 - Composer
-- **Optional:** Node.js 18+ and npm/yarn (only if you change frontend sources and rebuild assets)
+- Node.js 18+ and npm (to build the frontend assets)
 
-> **Note:** Compiled frontend assets are committed, so you do **not** need Node.js to run the app—only to develop or rebuild the asset bundle.
+> **Note:** Compiled frontend assets are not committed to git. Run `npm install && npm run build` on every install and deploy; the built files go to `public/build/`.
 
 ### Quick Start
 
@@ -60,8 +60,9 @@ Overview of send, delivery, opens, clicks, and not-delivered metrics with projec
    git clone https://github.com/alephcom/sestracking.git
    cd sestracking
    composer install
+   npm install
+   npm run build
    ```
-   > No need to run `npm install` unless you are working on the frontend build.
 
 2. **Environment configuration:**
    ```bash
@@ -80,29 +81,20 @@ Overview of send, delivery, opens, clicks, and not-delivered metrics with projec
    php artisan serve
    ```
 
-### Frontend Development (Optional)
+### Frontend Development
 
-If you want to modify Vue components, styles, or rebuild frontend assets:
-
-1. **Install Node.js dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Build assets for development:**
+1. **Start the Vite dev server** (hot reloads styles and scripts as you edit them):
    ```bash
    npm run dev
    ```
+   Keep it running alongside `php artisan serve`.
 
-3. **Watch for changes (development):**
+2. **Build for production:**
    ```bash
-   npm run watch
+   npm run build
    ```
 
-4. **Build for production:**
-   ```bash
-   npm run prod
-   ```
+> **Upgrading from an older version?** Assets used to be committed under `public/js`, `public/css` and `public/fonts` and built with Laravel Mix. Those folders are no longer used; run `npm install && npm run build` as part of your deploy, and delete the old folders if they are left over.
 
 ## Initial Data & Admin User
 

@@ -8,6 +8,14 @@ use PragmaRX\Google2FA\Google2FA;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Tests should not depend on `npm run build` having been run
+        $this->withoutVite();
+    }
+
     /**
      * Mark a password (non-SSO) user as having completed in-app TOTP enrollment.
      */

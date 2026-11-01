@@ -12,7 +12,7 @@
   <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#667eea">
   <meta name="msapplication-TileColor" content="#3b82f6">
   <meta name="theme-color" content="#3b82f6">
-  <link rel="stylesheet" href="{{ mix('css/app.css') }}">
+  @vite('resources/css/app.scss')
 
 </head>
 <body class="h-100">
