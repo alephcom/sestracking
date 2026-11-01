@@ -7,13 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrade notes
+- **A queue worker is now required.** Webhook events are saved by a queued job; run `php artisan queue:work` under a process manager and restart it after deploys (`php artisan queue:restart`). See README → Queue worker.
+- **Frontend assets must be built on deploy.** Compiled assets are no longer committed; run `npm install && npm run build` (output goes to `public/build/`). The old `public/js`, `public/css`, `public/fonts` and `public/mix-manifest.json` can be deleted.
+
 ### Added
+- Dashboard counter cards link to the Activity page, filtered to that event type, date range and project ([Issue #21](https://github.com/alephcom/sestracking/issues/21)); Activity gains a "Not Delivered" filter and accepts filters from the URL
+- Dashboard cache is cleared per project when new events arrive, on cache stores that support tags such as Redis or Memcached ([Issue #5](https://github.com/alephcom/sestracking/issues/5))
 - Artisan command `user:create` to provision local email/password users from the terminal — optional `--password`, `--generate-password`, `--super-admin`, and repeatable `--project=id:role` (role `admin` or `user`)
 - In-app TOTP two-factor authentication for email/password accounts (OAuth users are unchanged); enrollment completes after first sign-in until the user confirms the authenticator
 - Self-service password reset ([Issue #18](https://github.com/alephcom/sestracking/issues/18)): forgot-password link, emailed reset link, and set-new-password flow
 - Audit logging for password reset events
 
+### Changed
+- SES webhooks are processed by a queued `ProcessSesWebhook` job; the endpoint validates the request and returns immediately ([Issue #9](https://github.com/alephcom/sestracking/issues/9))
+- Frontend build migrated from Laravel Mix to Vite (`npm run dev` / `npm run build`) ([Issue #17](https://github.com/alephcom/sestracking/issues/17)); compiled assets are no longer committed ([Issue #7](https://github.com/alephcom/sestracking/issues/7))
+- Project request pages use a `ProjectRequestPolicy` instead of inline super-admin checks ([Issue #10](https://github.com/alephcom/sestracking/issues/10))
+
 ### Security
+- Webhook endpoint rate limited to 1000 requests per minute per IP, configurable with `WEBHOOK_RATE_LIMIT` ([Issue #4](https://github.com/alephcom/sestracking/issues/4))
 - Two-factor challenge flow hardened: per-user rate limiting on verification; abort/cancel uses a CSRF-protected POST; “remember me” is preserved through the 2FA step; documentation updated for the new behavior
 
 ### Performance
@@ -29,7 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Activity `eventType` filter rewritten from `whereHas` (nested EXISTS through `hasManyThrough`) to a `whereIn` subquery joining `email_recipients → recipient_events` directly
 
 ### Fixed
-- Suppress Sass deprecation warnings (`color-functions`, `global-builtin`, `import`) emitted by Bootstrap 5's SCSS when built with Sass 1.77+; configured `quietDeps` and `silenceDeprecations` in `webpack.mix.js`
+- Activity "Failure" event filter never matched anything (it filtered on `failure` instead of the stored `rendering_failure` type)
+- Activity export with an event type filter errored (it queried a table that no longer exists)
+- Duplicate SNS deliveries of an open or click event no longer double-count it
+- Webhook payloads missing required `mail` fields now return 400 instead of a server error
+- `ProjectPolicy` restore/force-delete checks called a non-existent `User::isAdmin()` method
+- Suppress Sass deprecation warnings (`color-functions`, `global-builtin`, `import`) emitted by Bootstrap 5's SCSS when built with Sass 1.77+; configured `quietDeps` and `silenceDeprecations` in the build config (now `vite.config.js`)
 
 ### Added
 - Mobile offcanvas navigation: hamburger button in the navbar on small screens opens a full Bootstrap 5 offcanvas panel with all nav sections (Dashboard, Activity, Reports, Settings, Admin)
