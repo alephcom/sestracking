@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\ProjectRequest;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -44,9 +43,7 @@ class ProjectRequestController extends Controller
      */
     public function index()
     {
-        if (!auth()->user()->isSuperAdmin()) {
-            abort(403, 'Only super admins can view project requests.');
-        }
+        $this->authorize('viewAny', ProjectRequest::class);
 
         $requests = ProjectRequest::with(['requester', 'approver', 'project'])
             ->orderBy('created_at', 'desc')
@@ -60,9 +57,7 @@ class ProjectRequestController extends Controller
      */
     public function approve(Request $request, ProjectRequest $projectRequest)
     {
-        if (!auth()->user()->isSuperAdmin()) {
-            abort(403, 'Only super admins can approve project requests.');
-        }
+        $this->authorize('approve', $projectRequest);
 
         if ($projectRequest->status !== 'pending') {
             return redirect()->route('project-requests.index')
@@ -127,9 +122,7 @@ class ProjectRequestController extends Controller
      */
     public function show(ProjectRequest $projectRequest)
     {
-        if (!auth()->user()->isSuperAdmin()) {
-            abort(403, 'Only super admins can view project request details.');
-        }
+        $this->authorize('view', $projectRequest);
 
         $projectRequest->load(['requester']);
 
@@ -144,9 +137,7 @@ class ProjectRequestController extends Controller
      */
     public function reject(Request $request, ProjectRequest $projectRequest)
     {
-        if (!auth()->user()->isSuperAdmin()) {
-            abort(403, 'Only super admins can reject project requests.');
-        }
+        $this->authorize('reject', $projectRequest);
 
         if ($projectRequest->status !== 'pending') {
             return redirect()->route('project-requests.index')

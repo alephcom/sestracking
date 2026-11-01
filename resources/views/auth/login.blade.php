@@ -10,8 +10,7 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
   <link rel="manifest" href="/site.webmanifest">
   <meta name="theme-color" content="#3b82f6">
-  <link rel="stylesheet" href="{{ mix('css/app.css') }}">
-  <link rel="stylesheet" href="{{ mix('css/signin.css') }}">
+  @vite(['resources/css/app.scss', 'resources/css/signin.scss'])
 </head>
 <body>
 

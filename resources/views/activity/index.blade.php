@@ -62,6 +62,6 @@
       }
     });
   </script>
-  <script src="{{ mix('js/activity.js') }}"></script>
+  @vite('resources/js/activity.js')
 
 @endsection

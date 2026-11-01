@@ -20,11 +20,8 @@ yarn-error.log
 /.claude
 /.vscode
 
-# Compiled assets - now committed so users don't need to run npm run production
-# /public/js/
-# /public/css/
-# /public/mix-manifest.json
-
-# Keep fonts and other static assets
-!/public/fonts/
-!/public/images/
+# Legacy Laravel Mix output (assets are now built by Vite into /public/build)
+/public/js/
+/public/css/
+/public/fonts/
+/public/mix-manifest.json

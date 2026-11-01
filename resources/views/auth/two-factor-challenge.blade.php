@@ -4,8 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>Two-factor authentication | SES Tracking</title>
-  <link rel="stylesheet" href="{{ mix('css/app.css') }}">
-  <link rel="stylesheet" href="{{ mix('css/signin.css') }}">
+  @vite(['resources/css/app.scss', 'resources/css/signin.scss'])
 </head>
 <body>
 

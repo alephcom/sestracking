@@ -37,8 +37,8 @@ Overview of send, delivery, opens, clicks, and not-delivered metrics with projec
 ## Architecture
 
 - **Backend:** Laravel 11, PHP 8.2+, MySQL 8
-- **Frontend:** JavaScript with Bootstrap 5, Chart.js, and Vue (see `package.json` / Mix build for UI components)
-- **Build:** Laravel Mix
+- **Frontend:** JavaScript with Bootstrap 5 and Chart.js
+- **Build:** Vite (via `laravel-vite-plugin`)
 - **Email provider:** Amazon SES
 - **Ingest:** Amazon SNS notifications → Laravel webhook controllers (idempotent processing)
 
@@ -49,9 +49,9 @@ Overview of send, delivery, opens, clicks, and not-delivered metrics with projec
 - PHP 8.2+
 - MySQL 8.0+
 - Composer
-- **Optional:** Node.js 18+ and npm/yarn (only if you change frontend sources and rebuild assets)
+- Node.js 18+ and npm (to build the frontend assets)
 
-> **Note:** Compiled frontend assets are committed, so you do **not** need Node.js to run the app—only to develop or rebuild the asset bundle.
+> **Note:** Compiled frontend assets are not committed to git. Run `npm install && npm run build` on every install and deploy; the built files go to `public/build/`.
 
 ### Quick Start
 
@@ -60,8 +60,9 @@ Overview of send, delivery, opens, clicks, and not-delivered metrics with projec
    git clone https://github.com/alephcom/sestracking.git
    cd sestracking
    composer install
+   npm install
+   npm run build
    ```
-   > No need to run `npm install` unless you are working on the frontend build.
 
 2. **Environment configuration:**
    ```bash
@@ -80,29 +81,20 @@ Overview of send, delivery, opens, clicks, and not-delivered metrics with projec
    php artisan serve
    ```
 
-### Frontend Development (Optional)
+### Frontend Development
 
-If you want to modify Vue components, styles, or rebuild frontend assets:
-
-1. **Install Node.js dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Build assets for development:**
+1. **Start the Vite dev server** (hot reloads styles and scripts as you edit them):
    ```bash
    npm run dev
    ```
+   Keep it running alongside `php artisan serve`.
 
-3. **Watch for changes (development):**
+2. **Build for production:**
    ```bash
-   npm run watch
+   npm run build
    ```
 
-4. **Build for production:**
-   ```bash
-   npm run prod
-   ```
+> **Upgrading from an older version?** Assets used to be committed under `public/js`, `public/css` and `public/fonts` and built with Laravel Mix. Those folders are no longer used; run `npm install && npm run build` as part of your deploy, and delete the old folders if they are left over.
 
 ## Initial Data & Admin User
 
@@ -159,6 +151,16 @@ APP_URL=http://localhost:8000
 
 ```
 
+### Optional: Faster dashboard updates (cache)
+
+Dashboard figures are cached for up to 5 minutes. With a cache store that supports tags (Redis or Memcached), each new webhook event clears the cache for its project, so the dashboard shows new events on the next load:
+
+```env
+CACHE_STORE=redis
+```
+
+With the default `file` or `database` stores the dashboard still works, but can be up to 5 minutes behind.
+
 ### Optional: Webhook Debug Logging
 ```env
 # Enable webhook payload logging for debugging (disable in production)
@@ -197,6 +199,18 @@ POST https://<your-domain.com>/webhook/{project_token}
 ```
 
 Each project has a unique token for webhook authentication.
+
+### Queue worker (required)
+
+The webhook only checks each notification and puts it on a queue, then answers SNS straight away. A queue worker does the actual saving, so **events will not show up on the dashboard unless a worker is running**. With the default `QUEUE_CONNECTION=database`:
+
+```bash
+php artisan queue:work --tries=3
+```
+
+In production, keep it running with a process manager such as Supervisor or systemd, and restart it after each deploy (`php artisan queue:restart`) so it picks up new code. Jobs that fail every attempt are kept in the `failed_jobs` table; see them with `php artisan queue:failed` and retry with `php artisan queue:retry all`.
+
+For local development you can set `QUEUE_CONNECTION=sync` to process webhooks immediately without a worker.
 
 ## TODO
 
