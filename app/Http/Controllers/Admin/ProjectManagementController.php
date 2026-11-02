@@ -156,6 +156,7 @@ class ProjectManagementController extends Controller
             'ses_suppression_auto_push_enabled' => $request->boolean('ses_suppression_auto_push_enabled'),
             'ses_suppression_push_complaints' => $request->boolean('ses_suppression_push_complaints'),
             'ses_suppression_push_soft_bounces' => $request->boolean('ses_suppression_push_soft_bounces'),
+            'allow_unsigned_webhooks' => $request->boolean('allow_unsigned_webhooks'),
             'ses_aws_access_key_id' => $key,
             'ses_aws_default_region' => $region,
         ];

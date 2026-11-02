@@ -24,8 +24,8 @@ class DashboardCacheInvalidationTest extends TestCase
         Cache::flush();
 
         $this->user = User::factory()->withTwoFactorEnrolled()->create(['super_admin' => true]);
-        $this->projectA = Project::factory()->create(['token' => 'token-a']);
-        $this->projectB = Project::factory()->create(['token' => 'token-b']);
+        $this->projectA = Project::factory()->allowingUnsignedWebhooks()->create(['token' => 'token-a']);
+        $this->projectB = Project::factory()->allowingUnsignedWebhooks()->create(['token' => 'token-b']);
     }
 
     private function sentCount(Project $project): int

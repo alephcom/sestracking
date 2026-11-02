@@ -13,7 +13,7 @@ class WebhookRateLimitTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        Project::factory()->create(['token' => 'rate-limit-token']);
+        Project::factory()->allowingUnsignedWebhooks()->create(['token' => 'rate-limit-token']);
     }
 
     /** @test */

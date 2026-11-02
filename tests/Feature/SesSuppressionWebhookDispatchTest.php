@@ -17,7 +17,7 @@ class SesSuppressionWebhookDispatchTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->project = Project::factory()->create([
+        $this->project = Project::factory()->allowingUnsignedWebhooks()->create([
             'token' => 'ses-suppress-token',
             'ses_suppression_auto_push_enabled' => true,
             'ses_suppression_push_complaints' => true,

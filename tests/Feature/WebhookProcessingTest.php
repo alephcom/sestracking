@@ -19,12 +19,14 @@ class WebhookProcessingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->project = Project::factory()->create(['token' => 'test-token-123']);
+        $this->project = Project::factory()->allowingUnsignedWebhooks()->create(['token' => 'test-token-123']);
     }
 
     /** @test */
-    public function webhook_handles_sns_subscription_confirmation()
+    public function webhook_rejects_unsigned_sns_subscription_confirmation_even_when_unsigned_webhooks_are_allowed()
     {
+        // Confirming a subscription visits SubscribeURL, so it always needs a valid SNS signature.
+        // Signed confirmations are covered in WebhookSnsSignatureTest.
         Http::fake();
 
         $confirmationPayload = [
@@ -35,12 +37,9 @@ class WebhookProcessingTest extends TestCase
 
         $response = $this->postJson('/webhook/test-token-123', $confirmationPayload);
 
-        $response->assertOk();
-        $response->assertSeeText('OK');
+        $response->assertForbidden();
 
-        Http::assertSent(function ($request) {
-            return $request->url() === 'https://sns.amazonaws.com/subscription-confirm-url';
-        });
+        Http::assertNothingSent();
     }
 
     /** @test */

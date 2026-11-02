@@ -21,7 +21,7 @@ class WebhookQueueTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->project = Project::factory()->create(['token' => 'queue-token']);
+        $this->project = Project::factory()->allowingUnsignedWebhooks()->create(['token' => 'queue-token']);
     }
 
     private function snsPayload(string $eventType, array $extra = [], string $snsMessageId = 'sns-queue-1'): array

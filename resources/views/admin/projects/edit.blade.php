@@ -38,6 +38,23 @@
                 <small class="form-text text-muted">This token is used for webhook authentication.</small>
             </div>
 
+            @php
+                $oldUnsigned = old('allow_unsigned_webhooks');
+                $checkedUnsigned = $oldUnsigned !== null ? (string) $oldUnsigned === '1' : $project->allow_unsigned_webhooks;
+            @endphp
+            <div class="form-group mb-3">
+                <label>Webhook security</label>
+                <div class="form-check">
+                    <input type="hidden" name="allow_unsigned_webhooks" value="0">
+                    <input type="checkbox" class="form-check-input" id="allow_unsigned_webhooks" name="allow_unsigned_webhooks" value="1" @checked($checkedUnsigned)>
+                    <label class="form-check-label" for="allow_unsigned_webhooks">Accept webhook requests that are not signed by Amazon SNS</label>
+                </div>
+                <small class="form-text text-muted">
+                    Leave this off if events reach this project through Amazon SNS (the usual setup): only requests signed by AWS are accepted.
+                    Turn it on only if you post SES events to the webhook directly, without SNS. Anyone who knows the webhook URL could then send fake events.
+                </small>
+            </div>
+
             <div class="form-group mb-3">
                 <label>Assign Users to Project</label>
                 

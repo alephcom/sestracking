@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Upgrade notes
+- **Webhook requests must now be signed by Amazon SNS.** Run `php artisan migrate`. Projects that post SES events directly (not through SNS) will get `403` until an admin enables **Accept webhook requests that are not signed by Amazon SNS** on the project. The server needs outbound HTTPS access to `sns.*.amazonaws.com` to download signing certificates.
 - **A queue worker is now required.** Webhook events are saved by a queued job; run `php artisan queue:work` under a process manager and restart it after deploys (`php artisan queue:restart`). See README → Queue worker.
 - **Frontend assets must be built on deploy.** Compiled assets are no longer committed; run `npm install && npm run build` (output goes to `public/build/`). The old `public/js`, `public/css`, `public/fonts` and `public/mix-manifest.json` can be deleted.
 
@@ -25,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project request pages use a `ProjectRequestPolicy` instead of inline super-admin checks ([Issue #10](https://github.com/alephcom/sestracking/issues/10))
 
 ### Security
+- Webhook requests are verified against Amazon SNS message signatures (versions 1 and 2), including subscription confirmations; a per-project setting allows unsigned requests for direct SES payloads ([Issue #8](https://github.com/alephcom/sestracking/issues/8))
 - Webhook endpoint rate limited to 1000 requests per minute per IP, configurable with `WEBHOOK_RATE_LIMIT` ([Issue #4](https://github.com/alephcom/sestracking/issues/4))
 - Two-factor challenge flow hardened: per-user rate limiting on verification; abort/cancel uses a CSRF-protected POST; “remember me” is preserved through the 2FA step; documentation updated for the new behavior
 

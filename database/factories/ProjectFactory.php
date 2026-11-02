@@ -17,4 +17,14 @@ class ProjectFactory extends Factory
             'token' => Str::random(32),
         ];
     }
+
+    /**
+     * Accept unsigned webhook requests (for tests that post raw payloads rather than signed SNS messages).
+     */
+    public function allowingUnsignedWebhooks(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'allow_unsigned_webhooks' => true,
+        ]);
+    }
 }
